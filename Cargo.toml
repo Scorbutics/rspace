@@ -1,0 +1,19 @@
+[package]
+name = "playground"
+version = "0.1.0"
+authors = ["Brice BULGARELLI <brice.bulgarelli.prestataire@sfr.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+generic_static = "0.2.0"
+once_cell = "1.7.2"
+fixedbitset = "0.4.0"
+tuple_list = "0.1.0"
+rand = "0.7"
+
+[dependencies.sdl2]
+version = "0.34"
+default-features = false
+features = ["ttf","image","gfx","mixer"]

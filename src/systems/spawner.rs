@@ -1,0 +1,79 @@
+use std::sync::{Arc, RwLock};
+
+use rand::Rng;
+use tuple_list::tuple_list_type;
+
+use crate::{components::{ai::AIComponent, followme::FollowMeComponent, force::ForceComponent, hitbox::HitboxComponent, lifetime::LifetimeComponent, spawner::{SpawnerComponent, SpawnerType}, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory};
+
+pub struct SpawnMobSystem {
+	base: Arc<RwLock<System>>
+}
+
+impl SystemComponents for SpawnMobSystem {
+	type Components = tuple_list_type!(SpawnerComponent, TransformComponent, HitboxComponent);
+}
+
+impl SystemNewable<SpawnMobSystem, ()> for SpawnMobSystem {
+	fn new(base: Arc<RwLock<System>>, _none: ()) -> Self {
+		SpawnMobSystem {
+			base: base
+		}
+	}
+}
+
+impl SpawnMobSystem {
+	fn spawn_enemies<'sdl_all, 'l>(game_services: &mut GameServices<'sdl_all, 'l>, origin_x: i32, origin_y: i32, angle_radian: f32, pos_offset_x: i32, pos_offset_y: i32, speed: f32, number: u16, luck_percents: f32) {
+		let mut before: Option<EntityId> = None;
+		for index in 0..number {
+			let mut rng = rand::thread_rng();
+			let random_percent= rng.gen_range(0.0, 100.0) as f32;
+			if random_percent < luck_percents {
+				let direction_vector = (f32::cos(index as f32 * angle_radian), f32::sin(index as f32 * angle_radian));
+				let position = (origin_x as f32 + direction_vector.0 * pos_offset_x as f32, origin_y as f32 + direction_vector.1 * pos_offset_y as f32);
+				let width = 16 * 4;
+				let height = 16 * 4;
+				let enemy = factory::create_physics_entity("enemy_spaceship.png", position.0 as i32, position.1 as i32, width, height, game_services);
+				let force = game_services.get_world_mut().get_component_mut::<ForceComponent>(&enemy).unwrap();
+				force.vx = direction_vector.0 * speed as f32;
+				force.vy = direction_vector.1 * speed as f32;
+				//game_services.get_world_mut().add_component::<LifetimeComponent>(&enemy, LifetimeComponent::new(common::current_time_ms() + 5000));
+				if before.is_some() {
+					game_services.get_world_mut().add_component::<FollowMeComponent>(&enemy, FollowMeComponent::new(before.unwrap(), 1.0));
+				} else {
+					game_services.get_world_mut().add_component::<AIComponent>(&enemy, AIComponent::new(Some(factory::generate_enemy_movement_pattern()), 0.1));
+				}
+				before = Some(enemy);
+			}
+		}
+	}
+}
+
+impl Runnable for SpawnMobSystem {
+	fn run<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
+		for entity in self.base.read().unwrap().iter_entities() {
+			let world = game_services.get_world_mut();
+			let spawner = world.get_component::<SpawnerComponent>(entity).unwrap();
+			if spawner.num > 0 && common::current_time_ms() - spawner.last_spawn_ms > spawner.frequency_ms as u64 {
+				let area = world.get_component::<HitboxComponent>(entity).unwrap();
+				let pos = (area.hitbox.width() as i32/ spawner.num as i32, area.hitbox.height() as i32/ spawner.num as i32);
+				let origin = world.get_component::<TransformComponent>(entity).unwrap();
+				let origin = (origin.x as i32 - (area.hitbox.width() as i32/2) + area.hitbox.x, origin.y as i32 - (area.hitbox.height() as i32/2) + area.hitbox.y);
+				let propulsion = spawner.propulsion;
+				let num = spawner.num;
+				let luck_percents = spawner.luck_percents;
+
+				match spawner.spawner_type {
+					SpawnerType::CIRCLE => {
+						let angle_radian = spawner.max_angle / spawner.num as f32;
+						Self::spawn_enemies(game_services, origin.0, origin.1,
+							angle_radian, pos.0, pos.1, propulsion, num, luck_percents);
+					},
+					SpawnerType::POINT => todo!(),
+					SpawnerType::LINEAR => todo!(),
+				}
+				let spawner = game_services.get_world_mut().get_component_mut::<SpawnerComponent>(entity).unwrap();
+				spawner.last_spawn_ms = common::current_time_ms();
+			}
+		}
+	}
+}
