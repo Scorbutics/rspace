@@ -1,6 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode};
 
-use crate::{components::{input::{InputComponent, PlayerInput}, lifetime::LifetimeComponent, spawner::{SpawnerComponent, SpawnerType}}, core::{common::{self, GameServices}, ecs, states}, factory};
+use crate::{components::{input::{InputComponent, PlayerInput}, spawner::{SpawnerComponent, SpawnerType}}, core::{common::GameServices, ecs, states}, factory};
 
 use super::pause::PauseState;
 
@@ -30,10 +30,10 @@ impl states::State for PlayingState {
 			let y = (game_services.draw_context.screen_height() - height - 5) as i32;
 			self.player = factory::create_player("spaceship.png", x, y, width, height, 10.0, game_services);
 
-			let spawn_pos = ((game_services.draw_context.screen_width() / 2) as i32, (game_services.draw_context.screen_height() / 2) as i32);
-			let spawner = factory::create_entity("",  spawn_pos.0, spawn_pos.1, width, height, game_services);
-			game_services.get_world_mut().add_component::<SpawnerComponent>(&spawner, SpawnerComponent::new(SpawnerType::CIRCLE, 3000, 50.0, 3, 1.0, std::f32::consts::PI * 2.0));
-			game_services.get_world_mut().add_component::<LifetimeComponent>(&spawner, LifetimeComponent::new(common::current_time_ms() + 5000));
+			let spawn_pos = factory::random_outside_spawn_pos(game_services.draw_context.screen_width(), game_services.draw_context.screen_height());
+			let spawner = factory::create_entity("",  spawn_pos.0 as i32, spawn_pos.1 as i32, width, height, game_services);
+			game_services.get_world_mut().add_component::<SpawnerComponent>(&spawner, SpawnerComponent::new(SpawnerType::POINT, 3000, 50.0, 3, 1.0, std::f32::consts::PI * 2.0));
+			//game_services.get_world_mut().add_component::<LifetimeComponent>(&spawner, LifetimeComponent::new(common::current_time_ms() + 5000));
 		}
 	}
 

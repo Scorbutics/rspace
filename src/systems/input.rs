@@ -30,7 +30,7 @@ impl InputSystem {
 		let shot_height = 13 * 4;
 		let pos = game_services.get_world().get_component::<TransformComponent>(entity_id).unwrap();
 		let shot_pos = (pos.x as i32 + shot_width as i32/ 2, pos.y as i32 - shot_height as i32 / 2);
-		factory::create_shot("shot.png", shot_pos.0, shot_pos.1, shot_width, shot_height, 0.0, -10.0, SHOT_LIFETIME_MS, game_services);
+		factory::create_shot("shot.png", shot_pos.0, shot_pos.1, shot_width, shot_height, 0.0, -20.0, SHOT_LIFETIME_MS, game_services);
 	}
 }
 

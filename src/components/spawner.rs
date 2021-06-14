@@ -12,7 +12,8 @@ pub struct SpawnerComponent {
 	pub luck_percents: f32,
 	pub num: u16,
 	pub propulsion: f32,
-	pub max_angle: f32
+	pub max_angle: f32,
+	pub randomize_pos: bool
 }
 
 impl SpawnerComponent {
@@ -24,7 +25,8 @@ impl SpawnerComponent {
 			luck_percents: luck_percents,
 			num: num,
 			propulsion: propulsion,
-			max_angle: max_angle
+			max_angle: max_angle,
+			randomize_pos: true
 		}
 	}
 }

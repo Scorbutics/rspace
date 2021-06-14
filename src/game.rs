@@ -15,6 +15,7 @@ use crate::sdl2;
 use crate::systems::ai::AISystem;
 use crate::systems::followme::FollowMeSystem;
 use crate::systems::graphics::GraphicsSystem;
+use crate::systems::health::HealthSystem;
 use crate::systems::input::InputSystem;
 use crate::systems::lifetime::LifetimeSystem;
 use crate::systems::physics::PhysicsSystem;
@@ -50,6 +51,7 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 		game.systems.add_system::<SpawnMobSystem, ()>(&mut game.world, ());
 		game.systems.add_system::<FollowMeSystem, ()>(&mut game.world, ());
 		game.systems.add_system::<AISystem, ()>(&mut game.world, ());
+		game.systems.add_system::<HealthSystem, ()>(&mut game.world, ());
 		game
 	}
 

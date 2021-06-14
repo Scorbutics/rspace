@@ -1,7 +1,7 @@
 use generic_static::StaticTypeMap;
 use once_cell::sync::OnceCell;
 use fixedbitset::FixedBitSet;
-use std::{any::Any, collections::{HashSet, hash_set}, sync::{Arc, RwLock, Weak, atomic::{AtomicUsize, Ordering}}};
+use std::{any::Any, collections::{HashMap, HashSet, hash_set}, sync::{Arc, RwLock, Weak, atomic::{AtomicUsize, Ordering}}};
 
 const ECS_MAX_COMPONENTS: usize = 100;
 const ECS_MAX_ENTITIES: usize = 10000;
@@ -148,25 +148,26 @@ struct ComponentEvent {
 }
 
 pub struct SystemHolder {
-	systems: Vec<Box<dyn Runnable>>
+	runnables: Vec<Box<dyn Runnable>>
 }
 
 impl SystemHolder {
 	pub fn new() -> Self {
 		SystemHolder {
-			systems: Vec::new()
+			runnables: Vec::new()
 		}
 	}
 
 	pub fn add_system<T: Runnable + SystemNewable<T, Args> + SystemComponents + 'static, Args>(&mut self, world: &mut World, args: Args) {
 		let system = System::new::<T::Components>();
 		world.register(system.clone());
-		self.systems.push(Box::new(T::new(system.clone(), args)));
+		world.register_system_base(system.clone());
+		self.runnables.push(Box::new(T::new(system.clone(), args)));
 	}
 
 	pub fn update<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
 		game_services.get_world_mut().update();
-		for system in self.systems.iter_mut() {
+		for system in self.runnables.iter_mut() {
 			system.run(game_services);
 		}
 	}
@@ -180,7 +181,8 @@ pub struct World {
 	event_bus: EventBusBase<ComponentEvent>,
 	components_remove_queue: HashSet<(EntityId, ComponentId)>,
 	entities_remove_queue: HashSet<EntityId>,
-	events: Vec<ComponentEvent>
+	events: Vec<ComponentEvent>,
+	bases: HashMap<u64, Arc<RwLock<System>>>
 }
 
 impl World {
@@ -193,10 +195,26 @@ impl World {
 			event_bus: EventBusBase::new(),
 			components_remove_queue: HashSet::new(),
 			entities_remove_queue: HashSet::new(),
-			events: Vec::new()
+			events: Vec::new(),
+			bases: HashMap::new()
 		};
 		world.entities_mask.resize(ECS_MAX_ENTITIES, Arc::new(RwLock::new(FixedBitSet::new())));
 		world
+	}
+
+	pub fn get_system_base<T: SystemComponents + 'static>(&self) -> Option<Weak<RwLock<System>>>{
+		let mut imask: u64 = 0;
+		T::Components::set_id(&mut imask);
+		let result = self.bases.get(&imask);
+		if result.is_none() {
+			None
+		} else {
+			Some(Arc::downgrade(result.unwrap()))
+		}
+	}
+
+	fn register_system_base(&mut self, system :Arc<RwLock<System>>) {
+		self.bases.insert(system.read().as_ref().unwrap().id, system.clone());
 	}
 
 	pub fn create_entity(&mut self) -> EntityId {
@@ -219,7 +237,7 @@ impl World {
 	pub fn add_component<T: Component + Default>(&mut self, entity_id: &EntityId, component: T) {
 		let holder = self.holder_mut::<T>();
 		let component_id = *build_component_id::<T>();
-		println!("ID : {}", component_id);
+		//println!("ID : {}", component_id);
 		holder.add_component(entity_id, component);
 		self.entities_mask[*entity_id].write().unwrap().set(component_id, true);
 		let event = ComponentEvent {
@@ -349,10 +367,12 @@ use super::common::GameServices;
 
 pub trait ComponentMaskSetBit {
 	fn set_bitset(bitset: &mut FixedBitSet);
+	fn set_id(imask: &mut u64);
 }
 
 impl ComponentMaskSetBit for () {
 	fn set_bitset(_bitset: &mut FixedBitSet) {}
+	fn set_id(_imask: &mut u64) {}
 }
 
 impl<Head, Tail> ComponentMaskSetBit for (Head, Tail) where
@@ -364,11 +384,18 @@ impl<Head, Tail> ComponentMaskSetBit for (Head, Tail) where
 		bitset.set(*component_id, true);
 		Tail::set_bitset(bitset);
 	}
+
+	fn set_id(imask: &mut u64) {
+		let component_id = build_component_id::<Head>();
+		*imask |= 2u64.pow(*component_id as u32);
+		Tail::set_id(imask)
+	}
 }
 
 pub struct System {
 	mask: FixedBitSet,
 	entities: HashSet<EntityId>,
+	id: u64
 }
 
 pub trait Runnable {
@@ -383,15 +410,16 @@ pub trait SystemNewable<T, Args> {
 	fn new(base: Arc<RwLock<System>>, args: Args) -> T;
 }
 
-
 impl System {
 	pub fn new<Components: ComponentMaskSetBit + TupleList>() -> Arc<RwLock<Self>> {
 		let mut system = System {
 			mask: FixedBitSet::with_capacity(ECS_MAX_COMPONENTS),
 			entities: HashSet::new(),
+			id: 0
 		};
 		Components::set_bitset(&mut system.mask);
-		println!("MASK {}", system.mask);
+		Components::set_id(&mut system.id);
+		println!("MASK {}, ID {}", system.mask, system.id);
 		Arc::new(RwLock::new(system))
 	}
 
@@ -405,14 +433,14 @@ impl EventObserver<ComponentEvent> for System {
 		let contained = self.mask.contains(data.component_id);
 		if data.event_type == 0 && contained && !self.entities.contains(&data.entity_id) {
 			if (&self.mask & &data.entity_mask.upgrade().unwrap().read().unwrap()) == self.mask {
-				println!("ENTITY {} ADDED TO SYSTEM", data.entity_id);
+				//println!("ENTITY {} ADDED TO SYSTEM", data.entity_id);
 				self.entities.insert(data.entity_id);
 			} else {
-				println!("ENTITY {} IS MISSING SOME BITS", data.entity_id);
+				//println!("ENTITY {} IS MISSING SOME BITS", data.entity_id);
 			}
-			println!("SYSTEM : {}\nENTITY : {}", self.mask, data.entity_mask.upgrade().unwrap().read().unwrap());
+			//println!("SYSTEM : {}\nENTITY : {}", self.mask, data.entity_mask.upgrade().unwrap().read().unwrap());
 		} else if data.event_type == 1 && self.entities.contains(&data.entity_id) {
-			println!("ENTITY {} REMOVED FROM SYSTEM", data.entity_id);
+			//println!("ENTITY {} REMOVED FROM SYSTEM", data.entity_id);
 			self.entities.remove(&data.entity_id);
 		}
 	}

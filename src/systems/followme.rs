@@ -42,7 +42,7 @@ impl Runnable for FollowMeSystem {
 				let entity_hitbox_min = std::cmp::min(entity_hitbox.hitbox.width(), entity_hitbox.hitbox.height());
 				let followed_hitbox = game_services.get_world().get_component::<HitboxComponent>(&followme_leader).unwrap();
 				let followed_hitbox_min = std::cmp::min(followed_hitbox.hitbox.width(), followed_hitbox.hitbox.height());
-				let accepted_distance = (entity_hitbox_min + followed_hitbox_min) as f32 / 2.0;
+				let accepted_distance = (entity_hitbox_min + followed_hitbox_min) as f32 / 2.5;
 
 				let force = game_services.get_world_mut().get_component_mut::<ForceComponent>(entity_id).unwrap();
 				let distance_squared = maths::distance_squared(current_pos, target_pos);
@@ -55,6 +55,9 @@ impl Runnable for FollowMeSystem {
 					force.vx = 0.0;
 					force.vy = 0.0;
 				}
+			} else {
+				game_services.get_world_mut().remove_entity(entity_id);
+				println!("LEADER DEAD : {}", *entity_id);
 			}
 		}
 	}
