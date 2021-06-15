@@ -4,6 +4,7 @@ pub mod systems;
 pub mod components;
 pub mod factory;
 pub mod maths;
+pub mod levels;
 pub extern crate sdl2;
 mod game;
 

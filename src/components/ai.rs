@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::core::common::{self, current_time_ms};
 
 pub type DestinationPoint = (f32, f32);
@@ -6,7 +8,11 @@ pub struct TrajectorySequence {
 	points: Vec<DestinationPoint>,
 	start_time_ms: u64,
 	shoot_start_time_ms: u64,
-	pub shoot_delay_ms: u64
+	shoot_start_interval_time_ms: u64,
+	shoot_index: usize,
+	pub shoot_num: usize,
+	shoot_delay_ms: u64,
+	pub shoot_interval_ms: u64
 }
 
 impl TrajectorySequence {
@@ -18,7 +24,11 @@ impl TrajectorySequence {
 			points: Vec::new(),
 			start_time_ms: start_time_ms,
 			shoot_start_time_ms: 0,
-			shoot_delay_ms: 0
+			shoot_start_interval_time_ms: 0,
+			shoot_delay_ms: 0,
+			shoot_num: 0,
+			shoot_index: 0,
+			shoot_interval_ms: 300
 		}
 	}
 	pub fn push(&mut self, point: DestinationPoint) {
@@ -30,11 +40,35 @@ impl TrajectorySequence {
 	}
 
 	pub fn can_shoot(&mut self) -> bool {
-		let can_shoot = self.shoot_delay_ms != 0 && common::current_time_ms() - self.shoot_start_time_ms >= self.shoot_delay_ms;
-		if can_shoot {
-			self.shoot_start_time_ms = common::current_time_ms();
+		if self.shoot_delay_ms == 0 {
+			return false;
 		}
-		can_shoot
+		let current_time = common::current_time_ms();
+		let can_start_shoot = (current_time as i64 - self.shoot_start_time_ms as i64) >= self.shoot_delay_ms as i64;
+		if can_start_shoot {
+			self.shoot_index = 0;
+			self.shoot_start_time_ms = current_time;
+			self.shoot_start_interval_time_ms = self.shoot_start_time_ms.clone();
+			false
+		} else if self.shoot_index < self.shoot_num {
+			let can_shoot = self.shoot_interval_ms != 0 && (current_time as i64 - self.shoot_start_interval_time_ms as i64) >= self.shoot_interval_ms as i64;
+			if can_shoot {
+				self.shoot_start_interval_time_ms = current_time;
+				self.shoot_index += 1;
+				true
+			} else {
+				false
+			}
+		} else {
+			false
+		}
+	}
+
+	pub fn set_shoot_delay(&mut self, shoot_delay_ms: u64) {
+		self.shoot_delay_ms = shoot_delay_ms;
+		let mut rng = rand::thread_rng();
+		self.shoot_start_time_ms = common::current_time_ms() + rng.gen_range(0, self.shoot_delay_ms.clone());
+		self.shoot_start_interval_time_ms = self.shoot_start_time_ms.clone();
 	}
 }
 

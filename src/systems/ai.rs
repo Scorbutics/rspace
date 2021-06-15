@@ -51,7 +51,7 @@ impl AISystem {
 			let entity_center = maths::center(game_services.get_world(), entity_id);
 			let target_center = maths::center(game_services.get_world(), &target);
 
-			let velocity = maths::next_step_to_pos(entity_center, target_center, 3.0);
+			let velocity = maths::next_step_to_pos(entity_center, target_center, 5.0);
 			factory::create_shot("shot.png", shot_pos.0, shot_pos.1, shot_width as u32, shot_height as u32, velocity.0, velocity.1, SHOT_LIFETIME_MS, ShotType::ENEMY, game_services);
 		}
 	}

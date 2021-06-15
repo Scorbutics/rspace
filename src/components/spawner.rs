@@ -1,3 +1,5 @@
+use crate::levels::phases::TrajectoryType;
+
 
 pub enum SpawnerType {
 	CIRCLE,
@@ -6,7 +8,9 @@ pub enum SpawnerType {
 }
 
 pub struct SpawnerComponent {
+	pub trajectory_type: TrajectoryType,
 	pub spawner_type: SpawnerType,
+	pub countdown: usize,
 	pub frequency_ms: u32,
 	pub last_spawn_ms: u64,
 	pub luck_percents: f32,
@@ -17,7 +21,7 @@ pub struct SpawnerComponent {
 }
 
 impl SpawnerComponent {
-	pub fn new(spawner_type: SpawnerType, frequency_ms: u32, luck_percents: f32, num: u16, propulsion: f32, max_angle: f32) -> Self {
+	pub fn new(spawner_type: SpawnerType, frequency_ms: u32, luck_percents: f32, num: u16, propulsion: f32, max_angle: f32, trajectory_type: TrajectoryType) -> Self {
 		SpawnerComponent {
 			spawner_type: spawner_type,
 			frequency_ms: frequency_ms,
@@ -26,13 +30,15 @@ impl SpawnerComponent {
 			num: num,
 			propulsion: propulsion,
 			max_angle: max_angle,
-			randomize_pos: true
+			randomize_pos: true,
+			countdown: usize::MAX,
+			trajectory_type: trajectory_type
 		}
 	}
 }
 
 impl Default for SpawnerComponent {
 	fn default() -> Self {
-		SpawnerComponent::new(SpawnerType::POINT, 0, 0.0, 0, 0.0, std::f32::consts::PI * 2.0)
+		SpawnerComponent::new(SpawnerType::POINT, 0, 0.0, 0, 0.0, std::f32::consts::PI * 2.0, TrajectoryType::BasicLinear)
 	}
 }

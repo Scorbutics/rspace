@@ -1,6 +1,6 @@
-use rand::Rng;
+use rand::{Rng};
 
-use crate::{components::{ai::{DestinationPoint, TrajectorySequence}, force::ForceComponent, health::HealthComponent, hitbox::HitboxComponent, input::InputComponent, lifetime::LifetimeComponent, shot::{ShotComponent, ShotType}, sprite::{SpriteComponent, Spritesheet, SpritesheetOrientation}, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::EntityId}};
+use crate::{components::{ai::{DestinationPoint}, force::ForceComponent, health::HealthComponent, hitbox::HitboxComponent, input::InputComponent, lifetime::LifetimeComponent, shot::{ShotComponent, ShotType}, sprite::{SpriteComponent, Spritesheet, SpritesheetOrientation}, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::EntityId}};
 
 pub fn create_entity<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width: u32, height: u32, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId {
 	let entity = game_services.get_world_mut().create_entity();
@@ -45,45 +45,6 @@ pub fn create_shot<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width: 
 	hitbox.x += hitbox.w / 2;
 	hitbox.y += hitbox.h / 2;
 	entity
-}
-
-fn generate_circle_point(origin: &DestinationPoint, radius: &u32, angle: &f32) -> DestinationPoint {
-	(origin.0 + *radius as f32 * f32::cos(*angle), origin.1 + *radius as f32 * f32::sin(*angle))
-}
-
-fn generate_circle_pattern(origin: &DestinationPoint, circle_radius: u32, angle_start_degrees: i32, angle_end_degrees: i32, step_precision_portions: usize) -> TrajectorySequence {
-	assert!(angle_start_degrees < angle_end_degrees);
-	let mut sequence = TrajectorySequence::new();
-	let step = ((angle_end_degrees - angle_start_degrees) / step_precision_portions as i32) as usize;
-	for angle in (angle_start_degrees..(angle_end_degrees + step as i32)).step_by(step) {
-		let radian_angle = - angle as f32 * std::f32::consts::PI / 180.0;
-		sequence.push(generate_circle_point(origin, &circle_radius, &radian_angle));
-	}
-	sequence
-}
-
-fn generate_line_pattern(origin: &DestinationPoint, destination: &DestinationPoint) -> TrajectorySequence {
-	let mut sequence = TrajectorySequence::new();
-	sequence.push(*origin);
-	sequence.push(*destination);
-	sequence.shoot_delay_ms = 4000;
-	sequence
-}
-
-pub fn generate_enemy_movement_pattern(start_time_ms: u64, screen_center: DestinationPoint) -> Vec<TrajectorySequence> {
-	let mut sequence = Vec::new();
-	let start_pos = (screen_center.0, screen_center.1 / 2.0);
-
-	sequence.push(TrajectorySequence::wait(start_time_ms));
-
-	let mut circle = generate_circle_pattern(&start_pos, 100, -90, 90, 10);
-	circle.shoot_delay_ms = 3000;
-	let last_circle_point = circle.last().unwrap().clone();
-	sequence.push(circle);
-	let final_pos = (screen_center.0, screen_center.1 * 2.5);
-	sequence.push(generate_line_pattern(&last_circle_point, &final_pos));
-
-	sequence
 }
 
 pub fn random_outside_spawn_pos(screen_width: u32, screen_height: u32) -> DestinationPoint {

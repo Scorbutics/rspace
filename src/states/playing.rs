@@ -1,13 +1,15 @@
 use sdl2::{event::Event, keyboard::Keycode};
 
-use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}, spawner::{SpawnerComponent, SpawnerType}}, core::{common::GameServices, ecs, states}, factory};
+use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::Level1Start}};
 
-use super::pause::PauseState;
+use super::{pause::PauseState};
 
 pub struct PlayingState {
 	player: ecs::EntityId,
 	pause: bool,
-	inputs: [bool; PlayerInput::LAST as usize]
+	inputs: [bool; PlayerInput::LAST as usize],
+	levels: Vec<Level>,
+	current_level_index: usize
 }
 
 impl PlayingState {
@@ -15,7 +17,9 @@ impl PlayingState {
 		PlayingState {
 			player: 0,
 			pause: false,
-			inputs: [false; PlayerInput::LAST as usize]
+			inputs: [false; PlayerInput::LAST as usize],
+			levels: Vec::new(),
+			current_level_index: 0
 		}
 	}
 }
@@ -35,9 +39,8 @@ impl states::State for PlayingState {
 			hitbox.hitbox.x += hitbox.hitbox.w / 2;
 			hitbox.hitbox.y += hitbox.hitbox.h / 2;
 
-			let spawn_pos = factory::random_outside_spawn_pos(game_services.draw_context.screen_width(), game_services.draw_context.screen_height());
-			let spawner = factory::create_entity("",  spawn_pos.0 as i32, spawn_pos.1 as i32, width, height, game_services);
-			game_services.get_world_mut().add_component::<SpawnerComponent>(&spawner, SpawnerComponent::new(SpawnerType::POINT, 1000, 50.0, 3, 1.0, std::f32::consts::PI * 2.0));
+			let l1 = Box::new(Level1Start::new());
+			self.levels.push(Level::new(vec![l1]));
 			//game_services.get_world_mut().add_component::<LifetimeComponent>(&spawner, LifetimeComponent::new(common::current_time_ms() + 5000));
 		}
 	}
@@ -53,7 +56,14 @@ impl states::State for PlayingState {
 			let input = game_services.get_world_mut().get_component_mut::<InputComponent>(&self.player).unwrap();
 			input.inputs = self.inputs.clone();
 		}
-		game_continue
+		if self.current_level_index < self.levels.len() {
+			if ! self.levels[self.current_level_index].update(game_services) {
+				self.current_level_index += 1;
+			}
+			game_continue
+		} else {
+			false
+		}
 	}
 
 	fn on_leave<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>, destroy: bool) {
@@ -78,25 +88,25 @@ impl states::State for PlayingState {
 					self.pause = true;
 				},
 				Event::KeyDown {
-					keycode: Some(Keycode::Left),
+					keycode: Some(Keycode::Q),
 					..
 				} => {
 					self.inputs[PlayerInput::LEFT as usize] = true;
 				},
 				Event::KeyDown {
-					keycode: Some(Keycode::Right),
+					keycode: Some(Keycode::D),
 					..
 				} => {
 					self.inputs[PlayerInput::RIGHT as usize] = true;
 				},
 				Event::KeyDown {
-					keycode: Some(Keycode::Up),
+					keycode: Some(Keycode::Z),
 					..
 				} => {
 					self.inputs[PlayerInput::UP as usize] = true;
 				},
 				Event::KeyDown {
-					keycode: Some(Keycode::Down),
+					keycode: Some(Keycode::S),
 					..
 				} => {
 					self.inputs[PlayerInput::DOWN as usize] = true;
@@ -109,25 +119,25 @@ impl states::State for PlayingState {
 					self.inputs[PlayerInput::SHOOT as usize] = true;
 				},
 				Event::KeyUp {
-					keycode: Some(Keycode::Left),
+					keycode: Some(Keycode::Q),
 					..
 				} => {
 					self.inputs[PlayerInput::LEFT as usize] = false;
 				},
 				Event::KeyUp {
-					keycode: Some(Keycode::Right),
+					keycode: Some(Keycode::D),
 					..
 				} => {
 					self.inputs[PlayerInput::RIGHT as usize] = false;
 				},
 				Event::KeyUp {
-					keycode: Some(Keycode::Up),
+					keycode: Some(Keycode::Z),
 					..
 				} => {
 					self.inputs[PlayerInput::UP as usize] = false;
 				},
 				Event::KeyUp {
-					keycode: Some(Keycode::Down),
+					keycode: Some(Keycode::S),
 					..
 				} => {
 					self.inputs[PlayerInput::DOWN as usize] = false;
