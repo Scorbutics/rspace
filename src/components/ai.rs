@@ -1,10 +1,12 @@
-use crate::core::common::current_time_ms;
+use crate::core::common::{self, current_time_ms};
 
 pub type DestinationPoint = (f32, f32);
 
 pub struct TrajectorySequence {
 	points: Vec<DestinationPoint>,
 	start_time_ms: u64,
+	shoot_start_time_ms: u64,
+	pub shoot_delay_ms: u64
 }
 
 impl TrajectorySequence {
@@ -14,7 +16,9 @@ impl TrajectorySequence {
 	pub fn wait(start_time_ms: u64) -> Self {
 		TrajectorySequence {
 			points: Vec::new(),
-			start_time_ms: start_time_ms
+			start_time_ms: start_time_ms,
+			shoot_start_time_ms: 0,
+			shoot_delay_ms: 0
 		}
 	}
 	pub fn push(&mut self, point: DestinationPoint) {
@@ -23,6 +27,14 @@ impl TrajectorySequence {
 
 	pub fn last(&self) -> Option<&DestinationPoint> {
 		self.points.last()
+	}
+
+	pub fn can_shoot(&mut self) -> bool {
+		let can_shoot = self.shoot_delay_ms != 0 && common::current_time_ms() - self.shoot_start_time_ms >= self.shoot_delay_ms;
+		if can_shoot {
+			self.shoot_start_time_ms = common::current_time_ms();
+		}
+		can_shoot
 	}
 }
 
@@ -70,6 +82,14 @@ impl AIComponent {
 
 	pub fn set_movement_patterns(&mut self, patterns: Vec<TrajectorySequence>) {
 		self.trajectories = patterns;
+	}
+
+	pub fn can_shoot(&mut self) -> bool {
+		if self.current_trajectory >= self.trajectories.len() {
+			false
+		} else {
+			self.trajectories[self.current_trajectory].can_shoot()
+		}
 	}
 }
 

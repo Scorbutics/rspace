@@ -234,6 +234,10 @@ impl World {
 		self.entities_remove_queue.insert(*id);
 	}
 
+	pub fn is_alive(&self, id: &EntityId) -> bool {
+		self.entities.contains(id)
+	}
+
 	pub fn add_component<T: Component + Default>(&mut self, entity_id: &EntityId, component: T) {
 		let holder = self.holder_mut::<T>();
 		let component_id = *build_component_id::<T>();
@@ -425,6 +429,10 @@ impl System {
 
 	pub fn iter_entities(&self) -> hash_set::Iter<EntityId> {
 		self.entities.iter()
+	}
+
+	pub fn len_entities(&self) -> usize {
+		self.entities.len()
 	}
 }
 

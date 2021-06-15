@@ -31,17 +31,17 @@ pub fn create_player<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width
 	entity
 }
 
-pub fn create_shot<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width: u32, height: u32, vx: f32, vy: f32, lifetime: u64, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId {
+pub fn create_shot<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width: u32, height: u32, vx: f32, vy: f32, lifetime: u64, origin: ShotType, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId {
 	let entity = create_physics_entity(texture_name, x, y, width, height, game_services);
 	let world = game_services.get_world_mut();
-	world.add_component(&entity, ShotComponent::new(ShotType::PLAYER, 1));
+	world.add_component(&entity, ShotComponent::new(origin, 1));
 	world.add_component(&entity, LifetimeComponent::new(common::current_time_ms() + lifetime));
 	let force = world.get_component_mut::<ForceComponent>(&entity).unwrap();
 	force.vx = vx;
 	force.vy = vy;
 	let hitbox = &mut game_services.get_world_mut().get_component_mut::<HitboxComponent>(&entity).unwrap().hitbox;
-	hitbox.w /= 3;
-	hitbox.h /= 3;
+	hitbox.w /= 2;
+	hitbox.h /= 2;
 	hitbox.x += hitbox.w / 2;
 	hitbox.y += hitbox.h / 2;
 	entity
@@ -66,6 +66,7 @@ fn generate_line_pattern(origin: &DestinationPoint, destination: &DestinationPoi
 	let mut sequence = TrajectorySequence::new();
 	sequence.push(*origin);
 	sequence.push(*destination);
+	sequence.shoot_delay_ms = 4000;
 	sequence
 }
 
@@ -75,7 +76,8 @@ pub fn generate_enemy_movement_pattern(start_time_ms: u64, screen_center: Destin
 
 	sequence.push(TrajectorySequence::wait(start_time_ms));
 
-	let circle = generate_circle_pattern(&start_pos, 100, -90, 90, 10);
+	let mut circle = generate_circle_pattern(&start_pos, 100, -90, 90, 10);
+	circle.shoot_delay_ms = 3000;
 	let last_circle_point = circle.last().unwrap().clone();
 	sequence.push(circle);
 	let final_pos = (screen_center.0, screen_center.1 * 2.5);

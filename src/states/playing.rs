@@ -1,6 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode};
 
-use crate::{components::{input::{InputComponent, PlayerInput}, spawner::{SpawnerComponent, SpawnerType}}, core::{common::GameServices, ecs, states}, factory};
+use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}, spawner::{SpawnerComponent, SpawnerType}}, core::{common::GameServices, ecs, states}, factory};
 
 use super::pause::PauseState;
 
@@ -29,10 +29,15 @@ impl states::State for PlayingState {
 			let x = ((game_services.draw_context.screen_width() - width)/2)  as i32;
 			let y = (game_services.draw_context.screen_height() - height - 5) as i32;
 			self.player = factory::create_player("spaceship.png", x, y, width, height, 10.0, game_services);
+			let hitbox = game_services.get_world_mut().get_component_mut::<HitboxComponent>(&self.player).unwrap();
+			hitbox.hitbox.w /= 2;
+			hitbox.hitbox.h /= 2;
+			hitbox.hitbox.x += hitbox.hitbox.w / 2;
+			hitbox.hitbox.y += hitbox.hitbox.h / 2;
 
 			let spawn_pos = factory::random_outside_spawn_pos(game_services.draw_context.screen_width(), game_services.draw_context.screen_height());
 			let spawner = factory::create_entity("",  spawn_pos.0 as i32, spawn_pos.1 as i32, width, height, game_services);
-			game_services.get_world_mut().add_component::<SpawnerComponent>(&spawner, SpawnerComponent::new(SpawnerType::POINT, 3000, 50.0, 3, 1.0, std::f32::consts::PI * 2.0));
+			game_services.get_world_mut().add_component::<SpawnerComponent>(&spawner, SpawnerComponent::new(SpawnerType::POINT, 1000, 50.0, 3, 1.0, std::f32::consts::PI * 2.0));
 			//game_services.get_world_mut().add_component::<LifetimeComponent>(&spawner, LifetimeComponent::new(common::current_time_ms() + 5000));
 		}
 	}
@@ -43,9 +48,12 @@ impl states::State for PlayingState {
 			*next_state = pause_state;
 			self.pause = false;
 		}
-		let input = game_services.get_world_mut().get_component_mut::<InputComponent>(&self.player).unwrap();
-		input.inputs = self.inputs.clone();
-		true
+		let game_continue = game_services.get_world().is_alive(&self.player);
+		if game_continue {
+			let input = game_services.get_world_mut().get_component_mut::<InputComponent>(&self.player).unwrap();
+			input.inputs = self.inputs.clone();
+		}
+		game_continue
 	}
 
 	fn on_leave<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>, destroy: bool) {
