@@ -76,10 +76,13 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 
 			// update the game loop here
 			if frame >= 30 {
-				self.systems.update(self.game_services.as_mut().unwrap());
-				self.state.update(self.game_services.as_mut().unwrap());
-				self.game_services.as_mut().unwrap().renderer.present();
-				self.game_services.as_mut().unwrap().renderer.clear();
+				let game_services = self.game_services.as_mut().unwrap();
+				self.systems.update(game_services);
+				if ! self.state.update(game_services) {
+					break 'running;
+				}
+				game_services.renderer.present();
+				game_services.renderer.clear();
 				frame = 0;
 			}
 

@@ -27,7 +27,7 @@ impl StateDispatcher {
 		self.next_state = Some(next_state);
 	}
 
-	pub fn update<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>) {
+	pub fn update<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>) -> bool {
 		let next_state = self.next_state.take();
 		if next_state.is_some() {
 			let old_state = self.states.last_mut();
@@ -41,14 +41,18 @@ impl StateDispatcher {
 		}
 
 		let mut current_state = self.states.last_mut();
-		let state_continue = current_state.as_mut().unwrap().update(&mut self.next_state, game_services);
-		if ! state_continue {
-			self.states.pop().unwrap().on_leave(game_services, true);
-			let current_state = self.states.last_mut();
-			if current_state.is_some() {
-				current_state.unwrap().on_enter(game_services, false);
+		let no_more_states = current_state.is_none();
+		if ! no_more_states {
+			let state_continue = current_state.as_mut().unwrap().update(&mut self.next_state, game_services);
+			if ! state_continue {
+				self.states.pop().unwrap().on_leave(game_services, true);
+				let current_state = self.states.last_mut();
+				if current_state.is_some() {
+					current_state.unwrap().on_enter(game_services, false);
+				}
 			}
 		}
+		! no_more_states
 	}
 
 	pub fn dispatch_event(&mut self, event: &Event) -> bool {
