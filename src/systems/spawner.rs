@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use rand::Rng;
 use tuple_list::tuple_list_type;
 
-use crate::{components::{ai::AIComponent, followme::FollowMeComponent, force::ForceComponent, hitbox::HitboxComponent, lifetime::LifetimeComponent, spawner::{SpawnerComponent, SpawnerType}, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory};
+use crate::{components::{ai::AIComponent, hitbox::HitboxComponent, spawner::{SpawnerComponent, SpawnerType}, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{Runnable, System, SystemComponents, SystemNewable}}, factory};
 
 pub struct SpawnMobSystem {
 	base: Arc<RwLock<System>>
@@ -33,6 +33,9 @@ impl SpawnMobSystem {
 				let width = 16 * 4;
 				let height = 16 * 4;
 				let enemy = factory::create_living_entity("enemy_spaceship.png", position.0 as i32, position.1 as i32, width, height, game_services);
+				let hitbox = game_services.get_world_mut().get_component_mut::<HitboxComponent>(&enemy).unwrap();
+				// Real enemy hitbox has an offset from the graphical one in order to make the shot "feels" like it really landed on the enemy
+				hitbox.hitbox.h -= 5 * 4;
 				let mut ai = AIComponent::new();
 				ai.set_movement_patterns(factory::generate_enemy_movement_pattern(common::current_time_ms() + (index as f32 * 300.0 / speed) as u64, ((game_services.draw_context.screen_width() / 2) as f32, (game_services.draw_context.screen_height() / 2) as f32)));
 				game_services.get_world_mut().add_component::<AIComponent>(&enemy, ai);

@@ -2,7 +2,7 @@ use std::{convert::TryFrom, sync::{Arc, RwLock}};
 
 use tuple_list::tuple_list_type;
 
-use crate::{components::{force::ForceComponent, input::{InputComponent, PlayerInput}, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory};
+use crate::{components::{force::ForceComponent, input::{InputComponent, PlayerInput}, sprite::SpriteComponent, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory};
 
 
 const PLAYER_SHOT_TIMER_MS: u64 = 300;
@@ -26,11 +26,12 @@ impl SystemNewable<InputSystem, ()> for InputSystem {
 
 impl InputSystem {
 	fn shoot<'sdl_all, 'l>(entity_id: &EntityId, game_services: &mut GameServices<'sdl_all, 'l>) {
-		let shot_width = 8 * 4;
-		let shot_height = 13 * 4;
+		let shot_width = 8 * 2;
+		let shot_height = 13 * 2;
 		let pos = game_services.get_world().get_component::<TransformComponent>(entity_id).unwrap();
-		let shot_pos = (pos.x as i32 + shot_width as i32/ 2, pos.y as i32 - shot_height as i32 / 2);
-		factory::create_shot("shot.png", shot_pos.0, shot_pos.1, shot_width, shot_height, 0.0, -20.0, SHOT_LIFETIME_MS, game_services);
+		let graphic_box = game_services.get_world().get_component::<SpriteComponent>(entity_id).unwrap().graphic_box;
+		let shot_pos = (pos.x as i32 + graphic_box.w / 2 + graphic_box.x - shot_width / 2, pos.y as i32 - graphic_box.h / 2 - graphic_box.y);
+		factory::create_shot("shot.png", shot_pos.0, shot_pos.1, shot_width as u32, shot_height as u32, 0.0, -20.0, SHOT_LIFETIME_MS, game_services);
 	}
 }
 
