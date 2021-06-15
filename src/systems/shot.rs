@@ -1,6 +1,5 @@
 use std::sync::{Arc, RwLock};
 
-use sdl2::rect::Rect;
 use tuple_list::tuple_list_type;
 
 use crate::{components::{health::HealthComponent, hitbox::HitboxComponent, input::InputComponent, shot::{ShotComponent, ShotType}, transform::TransformComponent}, core::{common::{GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable, World}}, maths};
@@ -60,8 +59,7 @@ impl Runnable for ShotSystem {
 							} else {
 								None
 							}
-						},
-						_ => None
+						}
 					};
 
 					if target_entity.is_some() {

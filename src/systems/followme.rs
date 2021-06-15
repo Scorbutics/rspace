@@ -1,9 +1,8 @@
 use std::sync::{Arc, RwLock};
 
-use sdl2::rect::Rect;
 use tuple_list::tuple_list_type;
 
-use crate::{components::{followme::FollowMeComponent, force::ForceComponent, hitbox::HitboxComponent, transform::TransformComponent}, core::{common::GameServices, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable, World}}, game, maths};
+use crate::{components::{followme::FollowMeComponent, force::ForceComponent, hitbox::HitboxComponent, transform::TransformComponent}, core::{common::GameServices, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable, World}}, maths};
 
 pub struct FollowMeSystem {
 	base: Arc<RwLock<System>>

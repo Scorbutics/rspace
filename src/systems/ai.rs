@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use tuple_list::tuple_list_type;
 
-use crate::{components::{ai::AIComponent, force::ForceComponent, hitbox::HitboxComponent, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{Runnable, System, SystemComponents, SystemNewable}}, maths};
+use crate::{components::{ai::AIComponent, force::ForceComponent, hitbox::HitboxComponent, transform::TransformComponent}, core::{common::{GameServices}, ecs::{Runnable, System, SystemComponents, SystemNewable}}, maths};
 
 pub struct AISystem {
 	base: Arc<RwLock<System>>
