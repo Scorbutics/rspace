@@ -82,6 +82,18 @@ impl states::State for PlayingState {
 					self.inputs[PlayerInput::RIGHT as usize] = true;
 				},
 				Event::KeyDown {
+					keycode: Some(Keycode::Up),
+					..
+				} => {
+					self.inputs[PlayerInput::UP as usize] = true;
+				},
+				Event::KeyDown {
+					keycode: Some(Keycode::Down),
+					..
+				} => {
+					self.inputs[PlayerInput::DOWN as usize] = true;
+				},
+				Event::KeyDown {
 					keycode: Some(Keycode::Space),
 					repeat: false,
 					..
@@ -99,6 +111,18 @@ impl states::State for PlayingState {
 					..
 				} => {
 					self.inputs[PlayerInput::RIGHT as usize] = false;
+				},
+				Event::KeyUp {
+					keycode: Some(Keycode::Up),
+					..
+				} => {
+					self.inputs[PlayerInput::UP as usize] = false;
+				},
+				Event::KeyUp {
+					keycode: Some(Keycode::Down),
+					..
+				} => {
+					self.inputs[PlayerInput::DOWN as usize] = false;
 				},
 				Event::KeyUp {
 					keycode: Some(Keycode::Space),

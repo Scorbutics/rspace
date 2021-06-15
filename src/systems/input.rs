@@ -45,19 +45,24 @@ impl Runnable for InputSystem {
 			};
 
 			let mut direction_x = 0.0;
+			let mut direction_y = 0.0;
 			let mut shoot = false;
 			for (i, vkey) in inputs_iter {
 				if *vkey {
 					match PlayerInput::try_from(&i).unwrap() {
 						PlayerInput::LEFT => direction_x = -1.0,
 						PlayerInput::RIGHT => direction_x = 1.0,
+						PlayerInput::UP => direction_y = -1.0,
+						PlayerInput::DOWN => direction_y = 1.0,
 						PlayerInput::SHOOT => shoot = true,
 						_ => {},
 					}
 				}
 			}
 			let force = game_services.get_world_mut().get_component_mut::<ForceComponent>(entity).unwrap();
-			force.vx = power * direction_x;
+			let factor = if direction_x != 0.0 && direction_y != 0.0 { 0.7071 } else { 1.0 };
+			force.vx = power * direction_x * factor;
+			force.vy = power * direction_y * factor;
 
 			if shoot {
 				let input = game_services.get_world_mut().get_component_mut::<InputComponent>(entity).unwrap();

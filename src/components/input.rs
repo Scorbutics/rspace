@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 pub enum PlayerInput {
-	LEFT, RIGHT, SHOOT, LAST
+	LEFT, RIGHT, UP, DOWN, SHOOT, LAST
 }
 
 impl TryFrom<&usize> for PlayerInput {
@@ -11,7 +11,9 @@ impl TryFrom<&usize> for PlayerInput {
 		match *v {
 			0 => Ok(PlayerInput::LEFT),
 			1 => Ok(PlayerInput::RIGHT),
-			2 => Ok(PlayerInput::SHOOT),
+			2 => Ok(PlayerInput::UP),
+			3 => Ok(PlayerInput::DOWN),
+			4 => Ok(PlayerInput::SHOOT),
 			_ => Err(()),
 		}
 	}
