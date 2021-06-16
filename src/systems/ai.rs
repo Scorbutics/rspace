@@ -27,8 +27,8 @@ const SHOT_LIFETIME_MS: u64 = 6000;
 
 impl AISystem {
 	fn shoot<'sdl_all, 'l>(entity_id: &EntityId, game_services: &mut GameServices<'sdl_all, 'l>) {
-		let shot_width = 8;
-		let shot_height = 13 * 2;
+		let shot_width = 16;
+		let shot_height = 16 * 2;
 		let pos = game_services.get_world().get_component::<TransformComponent>(entity_id).unwrap();
 		let graphic_box = game_services.get_world().get_component::<SpriteComponent>(entity_id).unwrap().graphic_box;
 		let shot_pos = (pos.x as i32 + graphic_box.w / 2 + graphic_box.x - shot_width / 2, pos.y as i32 + graphic_box.h + graphic_box.y);

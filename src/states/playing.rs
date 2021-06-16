@@ -1,6 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode};
 
-use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::Level1Start}};
+use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}, sprite::{SpriteComponent, Spritesheet, SpritesheetOrientation}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::Level1Start}};
 
 use super::{pause::PauseState};
 
@@ -28,9 +28,11 @@ impl states::State for PlayingState {
 	fn on_enter<'sdl_all, 'l>(&mut self, game_services: & mut GameServices<'sdl_all, 'l>, create: bool) {
 		println!("ENTER PLAYING ! {}", create);
 		if create {
-			let width = 16 * 4;
-			let height = 16 * 4;
-			let x = ((game_services.draw_context.screen_width() - width)/2)  as i32;
+			let src_width = 16;
+			let src_height = 16;
+			let width = src_width * 4;
+			let height = src_height * 4;
+			let x = ((game_services.draw_context.screen_width() - width) / 2)  as i32;
 			let y = (game_services.draw_context.screen_height() - height - 5) as i32;
 			self.player = factory::create_player("spaceship.png", x, y, width, height, 10.0, game_services);
 			let hitbox = game_services.get_world_mut().get_component_mut::<HitboxComponent>(&self.player).unwrap();
@@ -38,6 +40,10 @@ impl states::State for PlayingState {
 			hitbox.hitbox.h /= 2;
 			hitbox.hitbox.x += hitbox.hitbox.w / 2;
 			hitbox.hitbox.y += hitbox.hitbox.h / 2;
+
+			let sprite_component = game_services.get_world_mut().get_component_mut::<SpriteComponent>(&self.player).unwrap();
+			sprite_component.spritesheet = Some(Spritesheet::new(3, 2, SpritesheetOrientation::HORIZONTAL, src_width, src_height));
+			sprite_component.animation_delay = 130;
 
 			let l1 = Box::new(Level1Start::new());
 			self.levels.push(Level::new(vec![l1]));

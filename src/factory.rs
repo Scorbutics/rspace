@@ -71,7 +71,7 @@ pub fn create_animation<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, sr
 	if ! texture_name.is_empty() {
 		let sprite = game_services.resource_manager.load_texture(&texture_name);
 		let mut sprite_component = SpriteComponent::new(sprite.unwrap(), dst_width, dst_height);
-		sprite_component.spritesheet = Some(Spritesheet::new(num, orientation, src_width, src_height));
+		sprite_component.spritesheet = Some(Spritesheet::new(num, 1, orientation, src_width, src_height));
 		sprite_component.animation_delay = delay;
 		game_services.get_world_mut().add_component(&entity, sprite_component);
 	}
