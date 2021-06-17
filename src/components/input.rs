@@ -1,5 +1,11 @@
 use std::convert::TryFrom;
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum State {
+	MoveRight,
+	MoveLeft,
+	Stand,
+}
 pub enum PlayerInput {
 	LEFT, RIGHT, UP, DOWN, SHOOT, LAST
 }
@@ -22,7 +28,9 @@ pub struct InputComponent {
 	pub inputs: [bool; PlayerInput::LAST as usize],
 	pub keyboard: bool,
 	pub power: f32,
-	pub shot_timer_start: u64
+	pub shot_timer_start: u64,
+	pub state: State,
+	pub last_state: State,
 }
 
 impl InputComponent {
@@ -31,7 +39,9 @@ impl InputComponent {
 			inputs: [false; PlayerInput::LAST as usize],
 			power: power,
 			shot_timer_start : 0,
-			keyboard: keyboard
+			keyboard: keyboard,
+			state: State::Stand,
+			last_state: State::Stand
 		}
 	}
 }

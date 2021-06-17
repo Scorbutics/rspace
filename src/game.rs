@@ -13,6 +13,7 @@ use crate::core::states::State;
 use crate::core::states::StateDispatcher;
 use crate::sdl2;
 use crate::systems::ai::AISystem;
+use crate::systems::animation::AnimationSystem;
 use crate::systems::followme::FollowMeSystem;
 use crate::systems::graphics::GraphicsSystem;
 use crate::systems::health::HealthSystem;
@@ -52,6 +53,7 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 		game.systems.add_system::<FollowMeSystem, ()>(&mut game.world, ());
 		game.systems.add_system::<AISystem, ()>(&mut game.world, ());
 		game.systems.add_system::<HealthSystem, ()>(&mut game.world, ());
+		game.systems.add_system::<AnimationSystem, ()>(&mut game.world, ());
 		game
 	}
 

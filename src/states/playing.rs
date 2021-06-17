@@ -43,8 +43,10 @@ impl states::State for PlayingState {
 
 			let sprite_component = game_services.get_world_mut().get_component_mut::<SpriteComponent>(&self.player).unwrap();
 			sprite_component.spritesheet = Some(Spritesheet::new(3, 2, SpritesheetOrientation::HORIZONTAL, src_width, src_height));
-			sprite_component.animation_delay = 130;
+			//sprite_component.animation_delay = 130;
 
+			let l1 = Box::new(Level1Start::new());
+			self.levels.push(Level::new(vec![l1]));
 			let l1 = Box::new(Level1Start::new());
 			self.levels.push(Level::new(vec![l1]));
 			//game_services.get_world_mut().add_component::<LifetimeComponent>(&spawner, LifetimeComponent::new(common::current_time_ms() + 5000));

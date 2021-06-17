@@ -2,7 +2,7 @@ use std::{convert::TryFrom, sync::{Arc, RwLock}};
 
 use tuple_list::tuple_list_type;
 
-use crate::{components::{force::ForceComponent, input::{InputComponent, PlayerInput}, shot::ShotType, sprite::SpriteComponent, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory};
+use crate::{components::{force::ForceComponent, input::{InputComponent, PlayerInput, State}, shot::ShotType, sprite::SpriteComponent, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory};
 
 
 const PLAYER_SHOT_TIMER_MS: u64 = 100;
@@ -76,13 +76,13 @@ impl Runnable for InputSystem {
 				}
 			}
 
-			let sprite_component = game_services.get_world_mut().get_component_mut::<SpriteComponent>(entity).unwrap();
-			sprite_component.animation_pause = !(right_move || left_move);
-			if ! sprite_component.animation_pause {
-				sprite_component.spritesheet_index.1 = right_move as usize;
+			let moving = right_move || left_move;
+			let input = game_services.get_world_mut().get_component_mut::<InputComponent>(entity).unwrap();
+			input.last_state = input.state;
+			if ! moving {
+				input.state = State::Stand;
 			} else {
-				sprite_component.spritesheet_index.0 = 0;
-				//sprite_component.animation_direction *= -1;
+				input.state = if right_move { State::MoveRight } else { State::MoveLeft };
 			}
 		}
 	}

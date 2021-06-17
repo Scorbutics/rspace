@@ -33,32 +33,6 @@ impl Runnable for GraphicsSystem {
 				let sprite = game_services.get_world_mut().get_component_mut::<SpriteComponent>(entity_id).unwrap();
 				let spritesheet = sprite.spritesheet.as_mut().unwrap();
 				let graphic_box = Rect::new(sprite.spritesheet_index.0 as i32 * spritesheet.width as i32, sprite.spritesheet_index.1 as i32 * spritesheet.height as i32, spritesheet.width, spritesheet.height);
-				let (sprite_index, frame_num) = match spritesheet.orientation {
-					SpritesheetOrientation::HORIZONTAL => {
-						(sprite.spritesheet_index.0 as i16, spritesheet.num_width)
-					},
-					SpritesheetOrientation::VERTICAL =>  {
-						(sprite.spritesheet_index.1 as i16, spritesheet.num_height)
-					},
-				};
-
-				let delay_off = (! sprite.animation_pause) && common::current_time_ms() - sprite.animation_start_time >= sprite.animation_delay;
-				if delay_off {
-					let next_index = if sprite_index + 1 >= frame_num as i16 && sprite.animation_direction == 1 || sprite_index == 0 && sprite.animation_direction == -1 {
-						if sprite.animation_loop && sprite.animation_direction == 1 {
-							0
-						} else if sprite.animation_loop && sprite.animation_direction == -1 {
-							frame_num as i16 - 1
-						} else {
-							sprite_index as i16
-						}
-					} else {
-						sprite_index + sprite.animation_direction
-					};
-					sprite.spritesheet_index = if spritesheet.orientation == SpritesheetOrientation::HORIZONTAL { (next_index as usize, sprite.spritesheet_index.1) } else { (sprite.spritesheet_index.0, next_index as usize)};
-					sprite.animation_start_time = common::current_time_ms();
-				}
-
 				src = Some(graphic_box);
 			} else {
 				src = Option::None;
