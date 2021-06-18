@@ -21,30 +21,23 @@ impl SystemNewable<AnimationSystem, ()> for AnimationSystem {
 }
 
 impl AnimationSystem {
-	fn change_animation_depending_on_moving(all: &mut AnimationComponent, last_state: State, state: State) -> bool {
+	fn compute_animation_depending_on_moving(last_state: State, state: State) -> Option<usize> {
 		if state == last_state {
-			return false;
+			return None;
 		}
 
-		let current;
+		let next;
 		if last_state == State::Stand {
-			current = if state == State::MoveRight { 0 } else { 2 };
+			next = if state == State::MoveRight { 2 } else { 0 };
 		} else {
 			if state == State::Stand {
-				current = if last_state == State::MoveRight { 3 } else { 1 };
+				next = if last_state == State::MoveRight { 3 } else { 1 };
 			} else {
-				current = if last_state == State::MoveRight { 5 } else { 4 };
+				next = if last_state == State::MoveRight { 5 } else { 4 };
 			}
 		}
 
-		let last_offset = all.get_offset();
-		//TODO for more cohence we should enqueue instead of replace
-		all.current = current;
-		all.reset();
-		all.current_offset(last_offset);
-		all.start();
-
-		true
+		Some(next)
 	}
 }
 
@@ -53,8 +46,11 @@ impl Runnable for AnimationSystem {
 		for entity_id in self.base.read().unwrap().iter_entities() {
 			let input = game_services.get_world().get_component::<InputComponent>(entity_id).unwrap();
 			let (last_state, state) = (input.last_state, input.state);
+			let next = Self::compute_animation_depending_on_moving(last_state, state);
 			let animation = game_services.get_world_mut().get_component_mut::<AnimationComponent>(entity_id).unwrap();
-			Self::change_animation_depending_on_moving(animation, last_state, state);
+			if next.is_some() {
+				animation.next(next.unwrap());
+			}
 			animation.update();
 
 			let frame = animation.get_offset();
@@ -62,6 +58,7 @@ impl Runnable for AnimationSystem {
 			let sprite = game_services.get_world_mut().get_component_mut::<SpriteComponent>(entity_id).unwrap();
 			sprite.spritesheet_index.0 = frame;
 			sprite.spritesheet_index.1 = origin;
+				//println!("{} : {}", sprite.spritesheet_index.0, sprite.spritesheet_index.1);
 		}
 	}
 }

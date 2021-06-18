@@ -60,6 +60,10 @@ impl Animation {
 		self
 	}
 
+	pub fn is_started(&self) -> bool {
+		self.started
+	}
+
 	pub fn reset(&mut self) {
 		self.count = self.count_start;
 		self.offset = self.offset_start;
@@ -118,6 +122,10 @@ impl Animation {
 		self.started = false;
 		if self.next.is_some() { self.next.as_mut().unwrap().borrow_mut().pause(); }
 		self
+	}
+
+	pub fn is_done(&self) -> bool {
+		self.count == 0 && (self.next.is_none() || self.next.as_ref().unwrap().borrow().is_done())
 	}
 
 	fn next_step_out_of_bounds(&self) -> AnimationOutOfBound {
