@@ -22,15 +22,12 @@ pub fn create_physics_entity<'sdl_all, 'world>(texture_name: &str, x: i32, y: i3
 pub fn create_living_entity<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width: u32, height: u32, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId  {
 	let entity = create_physics_entity(texture_name, x, y, width, height, game_services);
 	game_services.get_world_mut().add_component(&entity, HealthComponent::new(1));
-	entity
-}
 
-pub fn create_player<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width: u32, height: u32, power: f32, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId {
-	let entity = create_living_entity(texture_name, x, y, width, height, game_services);
-	game_services.get_world_mut().add_component(&entity, InputComponent::new(power, true));
+	let sprite_component = game_services.get_world_mut().get_component_mut::<SpriteComponent>(&entity).unwrap();
+	sprite_component.spritesheet = Some(Spritesheet::new(3, 2, SpritesheetOrientation::HORIZONTAL, 16, 16));
 
 	let mut animation_component = AnimationComponent::new();
-	let animation = Animation::new(0).frames(3).time(150).count(1).clone();
+	let animation = Animation::new(0).frames(3).time(80).count(1).clone();
 
 	let stand_to_right = animation.clone().origin(1).clone();
 	let right_to_stand = stand_to_right.clone().reverse().offset(2).clone();
@@ -45,15 +42,30 @@ pub fn create_player<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width
 	entity
 }
 
+pub fn create_player<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width: u32, height: u32, power: f32, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId {
+	let entity = create_living_entity(texture_name, x, y, width, height, game_services);
+	game_services.get_world_mut().add_component(&entity, InputComponent::new(power, true));
+	entity
+}
+
 pub fn create_shot<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, width: u32, height: u32, vx: f32, vy: f32, lifetime: u64, origin: ShotType, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId {
 	let entity = create_physics_entity(texture_name, x, y, width, height, game_services);
 	let world = game_services.get_world_mut();
 	world.add_component(&entity, ShotComponent::new(origin, 1));
 	world.add_component(&entity, LifetimeComponent::new(common::current_time_ms() + lifetime));
+
+	let sprite_component = world.get_component_mut::<SpriteComponent>(&entity).unwrap();
+	sprite_component.spritesheet = Some(Spritesheet::new(7, 1, SpritesheetOrientation::HORIZONTAL, 16, 16));
+	let mut animation_component = AnimationComponent::new();
+	let animation = Animation::new(0).frames(7).time(40).count(1).start().clone();
+	animation_component.set(vec![animation]);
+	animation_component.next(0);
+	world.add_component(&entity, animation_component);
+
 	let force = world.get_component_mut::<ForceComponent>(&entity).unwrap();
 	force.vx = vx;
 	force.vy = vy;
-	let hitbox = &mut game_services.get_world_mut().get_component_mut::<HitboxComponent>(&entity).unwrap().hitbox;
+	let hitbox = &mut world.get_component_mut::<HitboxComponent>(&entity).unwrap().hitbox;
 	hitbox.w /= 2;
 	hitbox.h /= 2;
 	hitbox.x += hitbox.w / 2;
@@ -86,8 +98,11 @@ pub fn create_animation<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, sr
 		let sprite = game_services.resource_manager.load_texture(&texture_name);
 		let mut sprite_component = SpriteComponent::new(sprite.unwrap(), dst_width, dst_height);
 		sprite_component.spritesheet = Some(Spritesheet::new(num, 1, orientation, src_width, src_height));
-		//sprite_component.animation_delay = delay;
 		game_services.get_world_mut().add_component(&entity, sprite_component);
+		let mut animation_component = AnimationComponent::new();
+		let animation = Animation::new(0).frames(8).time(delay).count(1).start().clone();
+		animation_component.set(vec![animation]);
+		game_services.get_world_mut().add_component(&entity, animation_component);
 	}
 	game_services.get_world_mut().add_component(&entity, TransformComponent::new(x as f32, y as f32));
 	entity

@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use sdl2::rect::Rect;
 use tuple_list::tuple_list_type;
 
-use crate::{components::{sprite::{SpriteComponent, SpritesheetOrientation}, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{Runnable, System, SystemComponents, SystemNewable}}};
+use crate::{components::{sprite::{SpriteComponent}, transform::TransformComponent}, core::{common::{GameServices}, ecs::{Runnable, System, SystemComponents, SystemNewable}}};
 
 pub struct GraphicsSystem {
 	base: Arc<RwLock<System>>
@@ -37,8 +37,7 @@ impl Runnable for GraphicsSystem {
 			} else {
 				src = Option::None;
 			}
-			game_services.renderer.render(game_services.resource_manager, sprite_index, src,
-					Some(rect)).expect("Error while rendering");
+			game_services.renderer.render(game_services.resource_manager, sprite_index, src, Some(rect)).expect("Error while rendering");
 		}
 	}
 }

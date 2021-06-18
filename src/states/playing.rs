@@ -1,6 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode};
 
-use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}, sprite::{SpriteComponent, Spritesheet, SpritesheetOrientation}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::Level1Start}};
+use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::Level1Start}};
 
 use super::{pause::PauseState};
 
@@ -40,10 +40,6 @@ impl states::State for PlayingState {
 			hitbox.hitbox.h /= 2;
 			hitbox.hitbox.x += hitbox.hitbox.w / 2;
 			hitbox.hitbox.y += hitbox.hitbox.h / 2;
-
-			let sprite_component = game_services.get_world_mut().get_component_mut::<SpriteComponent>(&self.player).unwrap();
-			sprite_component.spritesheet = Some(Spritesheet::new(3, 2, SpritesheetOrientation::HORIZONTAL, src_width, src_height));
-			//sprite_component.animation_delay = 130;
 
 			let l1 = Box::new(Level1Start::new());
 			self.levels.push(Level::new(vec![l1]));

@@ -2,6 +2,8 @@ use rand::Rng;
 
 use crate::core::common::{self, current_time_ms};
 
+use super::input::State;
+
 pub type DestinationPoint = (f32, f32);
 
 pub struct TrajectorySequence {
@@ -75,7 +77,11 @@ impl TrajectorySequence {
 pub struct AIComponent {
 	trajectories: Vec<TrajectorySequence>,
 	current_trajectory: usize,
-	current_point: usize
+	current_point: usize,
+	pub state: State,
+	pub last_state: State,
+	pub shot_power: f32,
+	pub speed: f32
 }
 
 impl AIComponent {
@@ -84,6 +90,10 @@ impl AIComponent {
 			trajectories: Vec::new(),
 			current_point: 0,
 			current_trajectory: 0,
+			state: State::Stand,
+			last_state: State::Stand,
+			shot_power: 5.0,
+			speed : 5.0
 		}
 	}
 	pub fn next_position(&mut self, actual_pos: &DestinationPoint, tolerance: &f32) -> Option<(f32, f32)> {

@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use rand::Rng;
 use tuple_list::tuple_list_type;
 
-use crate::{components::{ai::AIComponent, force::ForceComponent, hitbox::HitboxComponent, shot::ShotType, sprite::SpriteComponent, transform::TransformComponent}, core::{common::{GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory, maths};
+use crate::{components::{ai::AIComponent, force::ForceComponent, hitbox::HitboxComponent, input::State, shot::ShotType, sprite::SpriteComponent, transform::TransformComponent}, core::{common::{GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory, maths};
 
 use super::input::InputSystem;
 
@@ -26,7 +26,7 @@ impl SystemNewable<AISystem, ()> for AISystem {
 const SHOT_LIFETIME_MS: u64 = 6000;
 
 impl AISystem {
-	fn shoot<'sdl_all, 'l>(entity_id: &EntityId, game_services: &mut GameServices<'sdl_all, 'l>) {
+	fn shoot<'sdl_all, 'l>(entity_id: &EntityId, power: f32, game_services: &mut GameServices<'sdl_all, 'l>) {
 		let shot_width = 16;
 		let shot_height = 16 * 2;
 		let pos = game_services.get_world().get_component::<TransformComponent>(entity_id).unwrap();
@@ -51,8 +51,19 @@ impl AISystem {
 			let entity_center = maths::center(game_services.get_world(), entity_id);
 			let target_center = maths::center(game_services.get_world(), &target);
 
-			let velocity = maths::next_step_to_pos(entity_center, target_center, 5.0);
+			let velocity = maths::next_step_to_pos(entity_center, target_center, power);
 			factory::create_shot("shot.png", shot_pos.0, shot_pos.1, shot_width as u32, shot_height as u32, velocity.0, velocity.1, SHOT_LIFETIME_MS, ShotType::ENEMY, game_services);
+		}
+	}
+
+	fn compute_next_state(velocity_vector: &(f32, f32), trigger: f32) -> State {
+		let v = f32::abs(velocity_vector.0);
+		if v > - trigger && v < trigger {
+			State::Stand
+		} else if velocity_vector.0 > 0.0 {
+			State::MoveRight
+		} else {
+			State::MoveLeft
 		}
 	}
 }
@@ -63,18 +74,24 @@ impl Runnable for AISystem {
 			let current_pos = maths::center(game_services.get_world(), entity_id);
 
 			if game_services.get_world_mut().get_component_mut::<AIComponent>(entity_id).unwrap().can_shoot() {
-				Self::shoot(entity_id, game_services);
+				let shot_power = game_services.get_world_mut().get_component_mut::<AIComponent>(entity_id).unwrap().shot_power;
+				Self::shoot(entity_id, shot_power, game_services);
 			}
 
 			let ai = game_services.get_world_mut().get_component_mut::<AIComponent>(entity_id).unwrap();
-			// TODO ai.speed ?
-			let power = 3.0;
+			let power = ai.speed;
 			let next_pos = ai.next_position(&current_pos, &power);
 			if next_pos.is_some() {
 				let force = game_services.get_world_mut().get_component_mut::<ForceComponent>(entity_id).unwrap();
 				let velocity_vector = maths::next_step_to_pos(current_pos, next_pos.unwrap(), power);
+				let state = Self::compute_next_state(&velocity_vector, 2.0);
+
 				force.vx = velocity_vector.0;
 				force.vy = velocity_vector.1;
+
+				let ai = game_services.get_world_mut().get_component_mut::<AIComponent>(entity_id).unwrap();
+				ai.last_state = ai.state;
+				ai.state = state;
 			} else {
 				game_services.get_world_mut().remove_entity(entity_id);
 				println!("IA DEAD : {}", *entity_id);

@@ -156,16 +156,18 @@ impl Animation {
 			let next_index = match self.next_step_out_of_bounds() {
 				AnimationOutOfBound::Top => {
 					self.count -= 1;
-					self.frames as i16 - 1
+					0
 				},
 				AnimationOutOfBound::Bottom => {
 					self.count -= 1;
-					0
+					self.frames as i16 - 1
 				},
 				AnimationOutOfBound::None => sprite_index as i16 + self.step
 			};
 
-			self.offset = next_index as usize;
+			if self.count != 0 {
+				self.offset = next_index as usize;
+			}
 			self.start_ms = common::current_time_ms();
 		}
 		return (true, i);
