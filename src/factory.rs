@@ -92,7 +92,7 @@ pub fn random_outside_spawn_pos(screen_width: u32, screen_height: u32) -> Destin
 	}
 }
 
-pub fn create_animation<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, src_width: u32, src_height: u32, dst_width: u32, dst_height: u32, num: usize, orientation: SpritesheetOrientation, delay: u64, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId {
+pub fn create_animation<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, src_width: u32, src_height: u32, dst_width: u32, dst_height: u32, num: usize, orientation: SpritesheetOrientation, delay: u64, frames: usize, count: i32, game_services: &mut GameServices<'sdl_all, 'world>) -> EntityId {
 	let entity = game_services.get_world_mut().create_entity();
 	if ! texture_name.is_empty() {
 		let sprite = game_services.resource_manager.load_texture(&texture_name);
@@ -100,7 +100,7 @@ pub fn create_animation<'sdl_all, 'world>(texture_name: &str, x: i32, y: i32, sr
 		sprite_component.spritesheet = Some(Spritesheet::new(num, 1, orientation, src_width, src_height));
 		game_services.get_world_mut().add_component(&entity, sprite_component);
 		let mut animation_component = AnimationComponent::new();
-		let animation = Animation::new(0).frames(8).time(delay).count(1).start().clone();
+		let animation = Animation::new(0).frames(frames).time(delay).count(count).start().clone();
 		animation_component.set(vec![animation]);
 		game_services.get_world_mut().add_component(&entity, animation_component);
 	}

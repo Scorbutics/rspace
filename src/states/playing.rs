@@ -1,6 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode};
 
-use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::Level1Start}};
+use crate::{components::{force::ForceComponent, hitbox::HitboxComponent, input::{InputComponent, PlayerInput}, sprite::SpritesheetOrientation, transform::TransformComponent}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::Level1Start}};
 
 use super::{pause::PauseState};
 
@@ -45,7 +45,24 @@ impl states::State for PlayingState {
 			self.levels.push(Level::new(vec![l1]));
 			let l1 = Box::new(Level1Start::new());
 			self.levels.push(Level::new(vec![l1]));
-			//game_services.get_world_mut().add_component::<LifetimeComponent>(&spawner, LifetimeComponent::new(common::current_time_ms() + 5000));
+
+
+			// TODO background system ? or just push it in the graphics stack
+			/*let background_src_width = 320;
+			let background_src_height = 320;
+
+			let num_background_width = game_services.draw_context.screen_width() / background_src_width + 1;
+			let num_background_height = game_services.draw_context.screen_height() / background_src_height + 1;
+
+			for tile_width_index in 0..num_background_width {
+				for tile_height_index in 0..num_background_height {
+					let background_tile = factory::create_animation("star_background.png", (tile_width_index * background_src_width) as i32, (tile_height_index * background_src_height) as i32, background_src_width, background_src_height, background_src_width, background_src_height, 3, SpritesheetOrientation::HORIZONTAL, 300, 3, i32::MAX, game_services);
+					let mut force = ForceComponent::new();
+					force.vy = 0.5;
+					game_services.get_world_mut().add_component(&background_tile, force);
+				}
+			}*/
+
 		}
 	}
 

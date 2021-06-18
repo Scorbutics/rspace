@@ -28,7 +28,7 @@ impl Runnable for HealthSystem {
 			if health.health_points <= 0 {
 				world.remove_entity(entity);
 				let position = maths::center(world, entity);
-				let explosion = factory::create_animation("explosion.png", position.0 as i32 - 16, position.1 as i32 - 16, 16, 16, 16*2, 16*2, 8, SpritesheetOrientation::HORIZONTAL, 30, game_services);
+				let explosion = factory::create_animation("explosion.png", position.0 as i32 - 16, position.1 as i32 - 16, 16, 16, 16*2, 16*2, 8, SpritesheetOrientation::HORIZONTAL, 30, 8, 1, game_services);
 				game_services.get_world_mut().add_component::<LifetimeComponent>(&explosion, LifetimeComponent::new(common::current_time_ms() + 300));
 			}
 		}
