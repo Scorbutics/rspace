@@ -83,8 +83,7 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 				if ! self.state.update(game_services) {
 					break 'running;
 				}
-				game_services.renderer.present();
-				game_services.renderer.clear();
+				game_services.renderer.update(game_services.resource_manager);
 				frame = 0;
 			}
 

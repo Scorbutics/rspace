@@ -31,7 +31,7 @@ impl SpawnMobSystem {
 				let position = (origin_x as f32 + direction_vector.0 * pos_offset_x as f32, origin_y as f32 + direction_vector.1 * pos_offset_y as f32);
 				let width = 16 * 3;
 				let height = 16 * 3;
-				let enemy = factory::create_living_entity("invader_1.png", position.0 as i32, position.1 as i32, width, height, game_services);
+				let enemy = factory::create_living_entity("invader_1.png", position.0 as i32, position.1 as i32, 0, width, height, game_services);
 				let hitbox = game_services.get_world_mut().get_component_mut::<HitboxComponent>(&enemy).unwrap();
 				// Real enemy hitbox has an offset from the graphical one in order to make the shot "feels" like it really landed on the enemy
 				hitbox.hitbox.h -= 5 * 3;

@@ -1,6 +1,7 @@
+use std::borrow::Borrow;
 use std::rc::Rc;
 
-use sdl2::Sdl;
+use sdl2::{Sdl, render};
 use sdl2::VideoSubsystem;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -10,7 +11,7 @@ use sdl2::ttf::Font;
 use sdl2::ttf::{Sdl2TtfContext};
 use sdl2::video::{Window, WindowContext};
 
-use super::resources::FontDetails;
+use super::resources::{FontDetails, ResourceLoader};
 use super::resources::FontManager;
 use super::resources::TextureManager;
 
@@ -67,46 +68,91 @@ impl SdlDrawContext {
 
 pub struct SdlResourceManager<'sdl_all> {
 	texture_manager: TextureManager<'sdl_all, WindowContext>,
-	font_manager: FontManager<'sdl_all>,
-	textures: Vec<Rc<Texture<'sdl_all>>>
+	font_manager: FontManager<'sdl_all>
 }
 
 impl<'sdl_all> SdlResourceManager<'sdl_all> {
 	pub fn new(draw_context: &'sdl_all SdlDrawContext, texture_creator: &'sdl_all TextureCreator<WindowContext>) -> Self {
 		SdlResourceManager {
 			texture_manager: TextureManager::new(texture_creator),
-			font_manager: FontManager::new(&draw_context.font_context),
-			textures: Vec::new()
+			font_manager: FontManager::new(&draw_context.font_context)
 		}
 	}
 
-	pub fn load_texture(&mut self, filename: &str) -> Result<usize, String> {
-		let texture = self.texture_manager.load(filename);
-		match texture {
-			Ok(t) => self.textures.push(t),
+	pub fn load_shared_texture(&mut self, filename: &str) -> Result<i64, String> {
+		match self.texture_manager.load_shared(filename) {
+			Ok(t) => Ok(t.1),
 			Err(err) => { return Err(err); },
 		}
-		Ok(self.textures.len() - 1)
 	}
 
 	pub fn load_font(&mut self, font_details: &FontDetails) -> Result<Rc<Font>, String> {
-		self.font_manager.load(font_details)
+		match self.font_manager.load_shared(font_details) {
+			Ok(t) => Ok(t.0),
+			Err(err) => { return Err(err); },
+		}
 	}
 
-	pub fn get_texture(&self, texture_index: usize) -> &Texture<'sdl_all> {
-		&self.textures[texture_index]
+	pub fn get_texture(&self, texture_index: i64) -> Option<&Texture<'sdl_all>> {
+		self.texture_manager.from_index(texture_index)
+	}
+
+	pub fn get_texture_mut(&mut self, texture_index: i64) -> Option<&mut Texture<'sdl_all>> {
+		self.texture_manager.from_index_mut(texture_index)
+	}
+
+	pub fn load_unique_texture(&mut self, filename: &str) -> Result<i64, String> {
+		match self.texture_manager.load_unique(filename) {
+			Ok(t) => Ok(t.1),
+			Err(err) => { return Err(err); },
+		}
+	}
+
+}
+
+#[derive(PartialEq, Eq)]
+pub struct Renderable {
+	pub src: Option<Rect>,
+	pub dst: Option<Rect>,
+	pub texture_index: i64,
+	pub z: i64
+}
+
+impl Renderable {
+	pub fn new(texture_index: i64, src: Option<Rect>, dst: Option<Rect>, z: i64) -> Self {
+		Renderable {
+			texture_index: texture_index,
+			src: src,
+			dst: dst,
+			z: z
+		}
 	}
 }
 
+impl PartialOrd for Renderable {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		self.z.partial_cmp(&other.z)
+	}
+}
+
+impl Ord for Renderable {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.z.cmp(&other.z)
+	}
+}
+
+// TODO SceneGraph, or QuadTree, or I don't know...
 pub struct SdlRenderer {
-	canvas: Canvas<Window>
+	canvas: Canvas<Window>,
+	renderables: Vec<Renderable>
 }
 
 impl SdlRenderer {
 	pub fn new(canvas: Canvas<Window>) -> Self {
 		println!("Using SDL_Renderer \"{}\"", canvas.info().name);
 		SdlRenderer {
-			canvas: canvas
+			canvas: canvas,
+			renderables: Vec::new()
 		}
 	}
 
@@ -115,13 +161,34 @@ impl SdlRenderer {
 		self.canvas.clear();
 	}
 
-	pub fn render<'sdl_all>(&mut self, resource_manager: &SdlResourceManager<'sdl_all>, texture_index: usize, src: Option<Rect>, dst: Option<Rect>) -> Result<(), String> {
+	fn render<'sdl_all>(canvas: &mut Canvas<Window>, resource_manager: &SdlResourceManager<'sdl_all>, texture_index: i64, src: Option<Rect>, dst: Option<Rect>) -> Result<(), String> {
 		let texture = resource_manager.get_texture(texture_index);
-		self.canvas.copy(texture, src, dst)
+		if let Some(value) = texture {
+			canvas.copy(value.borrow(), src, dst)
+		} else {
+			Err(String::new())
+		}
 	}
 
 	pub fn present(&mut self) {
 		self.canvas.present();
 	}
-}
 
+	pub fn update<'sdl_all>(&mut self, resource_manager: &SdlResourceManager<'sdl_all>) {
+		self.clear();
+		self.renderables.sort();
+		for renderable in &self.renderables {
+			Self::render(&mut self.canvas, resource_manager, renderable.texture_index, renderable.src, renderable.dst);
+		}
+		self.renderables.clear();
+		self.present();
+	}
+
+	pub fn set_renderables(&mut self, renderables: Vec<Renderable>) {
+		self.renderables = renderables
+	}
+
+	pub fn push_renderable(&mut self, renderable: Renderable) {
+		self.renderables.push(renderable)
+	}
+}

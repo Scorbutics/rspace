@@ -31,7 +31,7 @@ impl InputSystem {
 		let pos = game_services.get_world().get_component::<TransformComponent>(entity_id).unwrap();
 		let graphic_box = game_services.get_world().get_component::<SpriteComponent>(entity_id).unwrap().graphic_box;
 		let shot_pos = (pos.x as i32 + graphic_box.w / 2 + graphic_box.x - shot_width / 2, pos.y as i32 - graphic_box.h / 2 - graphic_box.y);
-		factory::create_shot("shot.png", shot_pos.0, shot_pos.1, shot_width as u32, shot_height as u32, 0.0, -20.0, SHOT_LIFETIME_MS, ShotType::PLAYER, game_services);
+		factory::create_shot("shot.png", shot_pos.0, shot_pos.1, 1, shot_width as u32, shot_height as u32, 0.0, -20.0, SHOT_LIFETIME_MS, ShotType::PLAYER, game_services);
 	}
 }
 
