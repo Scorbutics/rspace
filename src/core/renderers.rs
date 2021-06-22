@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::rc::Rc;
 
-use sdl2::{Sdl, render};
+use sdl2::Sdl;
 use sdl2::VideoSubsystem;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -11,7 +11,7 @@ use sdl2::ttf::Font;
 use sdl2::ttf::{Sdl2TtfContext};
 use sdl2::video::{Window, WindowContext};
 
-use super::resources::{FontDetails, ResourceLoader};
+use super::resources::{FontDetails};
 use super::resources::FontManager;
 use super::resources::TextureManager;
 
@@ -115,7 +115,10 @@ pub struct Renderable {
 	pub src: Option<Rect>,
 	pub dst: Option<Rect>,
 	pub texture_index: i64,
-	pub z: i64
+	pub z: i64,
+	pub flip_horizontal: bool,
+	pub flip_vertical: bool,
+	pub angle_degrees: u64,
 }
 
 impl Renderable {
@@ -124,9 +127,13 @@ impl Renderable {
 			texture_index: texture_index,
 			src: src,
 			dst: dst,
-			z: z
+			z: z,
+			flip_horizontal: false,
+			flip_vertical: false,
+			angle_degrees: 0
 		}
 	}
+
 }
 
 impl PartialOrd for Renderable {
@@ -150,23 +157,28 @@ pub struct SdlRenderer {
 impl SdlRenderer {
 	pub fn new(canvas: Canvas<Window>) -> Self {
 		println!("Using SDL_Renderer \"{}\"", canvas.info().name);
-		SdlRenderer {
+		let mut renderer = SdlRenderer {
 			canvas: canvas,
 			renderables: Vec::new()
-		}
+		};
+		renderer.set_draw_color(Color::RGB(0, 0, 0));
+		renderer
 	}
 
 	pub fn clear(&mut self) {
-		self.canvas.set_draw_color(Color::RGB(0, 0, 0));
 		self.canvas.clear();
 	}
 
-	fn render<'sdl_all>(canvas: &mut Canvas<Window>, resource_manager: &SdlResourceManager<'sdl_all>, texture_index: i64, src: Option<Rect>, dst: Option<Rect>) -> Result<(), String> {
+	pub fn set_draw_color(&mut self, color: Color) {
+		self.canvas.set_draw_color(color);
+	}
+
+	fn render<'sdl_all>(canvas: &mut Canvas<Window>, resource_manager: &SdlResourceManager<'sdl_all>, texture_index: i64, src: Option<Rect>, dst: Option<Rect>, angle_degrees: u64, flip_horizontal: bool, flip_vertical: bool) -> Result<(), String> {
 		let texture = resource_manager.get_texture(texture_index);
 		if let Some(value) = texture {
-			canvas.copy(value.borrow(), src, dst)
+			canvas.copy_ex(value.borrow(), src, dst, (angle_degrees as f64 / 180.0) * std::f64::consts::PI, None, flip_horizontal, flip_vertical)
 		} else {
-			Err(String::new())
+			Err("No Texture".to_owned())
 		}
 	}
 
@@ -178,7 +190,10 @@ impl SdlRenderer {
 		self.clear();
 		self.renderables.sort();
 		for renderable in &self.renderables {
-			Self::render(&mut self.canvas, resource_manager, renderable.texture_index, renderable.src, renderable.dst);
+			match Self::render(&mut self.canvas, resource_manager, renderable.texture_index, renderable.src, renderable.dst, renderable.angle_degrees, renderable.flip_horizontal, renderable.flip_vertical) {
+				Ok(_) => {},
+				Err(err) => panic!("{}", err),
+			}
 		}
 		self.renderables.clear();
 		self.present();

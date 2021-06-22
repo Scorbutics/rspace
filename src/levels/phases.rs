@@ -18,7 +18,7 @@ pub struct TrajectoryGenerator {
 
 impl TrajectoryGenerator {
 	fn generate_circle_point(origin: &DestinationPoint, radius: &u32, angle: &f32) -> DestinationPoint {
-		(origin.0 + *radius as f32 * f32::cos(*angle), origin.1 + *radius as f32 * f32::sin(*angle))
+		(origin.0 + *radius as f32 * fastapprox::fast::cos(*angle  % (2.0 * std::f32::consts::PI)), origin.1 + *radius as f32 * fastapprox::faster::sin(*angle % (2.0 * std::f32::consts::PI)))
 	}
 
 	fn generate_circle_pattern(origin: &DestinationPoint, circle_radius: u32, angle_start_degrees: i32, angle_end_degrees: i32, step_precision_portions: usize) -> TrajectorySequence {
@@ -88,7 +88,7 @@ impl TrajectoryGenerator {
 	}
 
 	fn enqueue_pattern_basic_diagonal_left(sequence: &mut Vec<TrajectorySequence>, screen_width: u32, screen_height: u32) {
-		let pos_left = (90.0, screen_height as f32 - 90.0);
+		let pos_left = (90.0, screen_height as f32 - 200.0);
 		let pos_right = (screen_width as f32 - 90.0, 90.0);
 
 		let mut diagonal = Self::generate_line_pattern(&pos_left, &pos_right);
@@ -103,7 +103,7 @@ impl TrajectoryGenerator {
 
 	fn enqueue_pattern_basic_diagonal_right(sequence: &mut Vec<TrajectorySequence>, screen_width: u32, screen_height: u32) {
 		let pos_left = (90.0, 90.0);
-		let pos_right = (screen_width as f32 - 90.0, screen_height as f32 - 90.0);
+		let pos_right = (screen_width as f32 - 90.0, screen_height as f32 - 200.0);
 
 		let mut diagonal = Self::generate_line_pattern(&pos_left, &pos_right);
 		diagonal.set_shoot_delay(3000);

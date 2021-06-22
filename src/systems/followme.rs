@@ -48,8 +48,8 @@ impl Runnable for FollowMeSystem {
 				if accepted_distance != 0.0 && distance_squared > (accepted_distance * accepted_distance) {
 					let angle = maths::angle_between_pos(current_pos, target_pos);
 					let factor = followme_speed + 0.6 * (distance_squared / (accepted_distance * accepted_distance));
-					force.vx = factor * f32::cos(angle);
-					force.vy = factor * f32::sin(angle);
+					force.vx = factor * fastapprox::faster::cos(angle % (2.0 * std::f32::consts::PI));
+					force.vy = factor * fastapprox::faster::sin(angle % (2.0 * std::f32::consts::PI));
 				} else {
 					force.vx = 0.0;
 					force.vy = 0.0;

@@ -5,7 +5,6 @@ use tuple_list::tuple_list_type;
 use crate::{components::{force::ForceComponent, input::{InputComponent, PlayerInput, State}, shot::ShotType, sprite::SpriteComponent, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{EntityId, Runnable, System, SystemComponents, SystemNewable}}, factory};
 
 
-const PLAYER_SHOT_TIMER_MS: u64 = 100;
 const SHOT_LIFETIME_MS: u64 = 2000;
 
 pub struct InputSystem {
@@ -70,7 +69,7 @@ impl Runnable for InputSystem {
 
 			if shoot {
 				let input = game_services.get_world_mut().get_component_mut::<InputComponent>(entity).unwrap();
-				if (common::current_time_ms() - input.shot_timer_start) >= PLAYER_SHOT_TIMER_MS {
+				if (common::current_time_ms() - input.shot_timer_start) >= input.shot_frequency_ms {
 					input.shot_timer_start = common::current_time_ms();
 					Self::shoot(entity, game_services);
 				}

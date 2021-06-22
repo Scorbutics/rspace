@@ -1,6 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode};
 
-use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::Level1Start}};
+use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::{Level1Mid, Level1Start}}};
 
 use super::{background::BackgroundStarField, pause::PauseState};
 
@@ -44,10 +44,7 @@ impl states::State for PlayingState {
 			hitbox.hitbox.x += hitbox.hitbox.w / 2;
 			hitbox.hitbox.y += hitbox.hitbox.h / 2;
 
-			let l1 = Box::new(Level1Start::new());
-			self.levels.push(Level::new(vec![l1]));
-			let l1 = Box::new(Level1Start::new());
-			self.levels.push(Level::new(vec![l1]));
+			self.levels.push(Level::new(vec![Box::new(Level1Start::new()), Box::new(Level1Mid::new()), Box::new(Level1Start::new())]));
 		}
 	}
 

@@ -27,7 +27,7 @@ impl SpawnMobSystem {
 			let mut rng = rand::thread_rng();
 			let random_percent= rng.gen_range(0.0, 100.0) as f32;
 			if random_percent < luck_percents {
-				let direction_vector = (f32::cos(index as f32 * angle_radian), f32::sin(index as f32 * angle_radian));
+				let direction_vector = (fastapprox::faster::cos((index as f32 * angle_radian) % (2.0 * std::f32::consts::PI)), fastapprox::faster::sin((index as f32 * angle_radian) % (2.0 * std::f32::consts::PI)));
 				let position = (origin_x as f32 + direction_vector.0 * pos_offset_x as f32, origin_y as f32 + direction_vector.1 * pos_offset_y as f32);
 				let width = 16 * 3;
 				let height = 16 * 3;

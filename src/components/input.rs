@@ -29,6 +29,7 @@ pub struct InputComponent {
 	pub keyboard: bool,
 	pub power: f32,
 	pub shot_timer_start: u64,
+	pub shot_frequency_ms: u64,
 	pub state: State,
 	pub last_state: State,
 }
@@ -39,6 +40,7 @@ impl InputComponent {
 			inputs: [false; PlayerInput::LAST as usize],
 			power: power,
 			shot_timer_start : 0,
+			shot_frequency_ms: 150,
 			keyboard: keyboard,
 			state: State::Stand,
 			last_state: State::Stand

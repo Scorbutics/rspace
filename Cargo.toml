@@ -12,6 +12,7 @@ once_cell = "1.7.2"
 fixedbitset = "0.4.0"
 tuple_list = "0.1.0"
 rand = "0.7"
+fastapprox = "0.3.0"
 
 [dependencies.sdl2]
 version = "0.34"

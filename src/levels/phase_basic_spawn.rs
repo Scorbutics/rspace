@@ -6,15 +6,17 @@ use super::phases::{LevelPhase, TrajectoryType};
 pub struct LevelPhaseBasicSpawn {
 	spawner: EntityId,
 	pattern: TrajectoryType,
-	density: usize
+	density: usize,
+	frequency_ms: u32,
 }
 
 impl LevelPhaseBasicSpawn {
-	pub fn new(pattern: TrajectoryType, density: usize) -> Self {
+	pub fn new(pattern: TrajectoryType, density: usize, frequency_ms: u32) -> Self {
 		LevelPhaseBasicSpawn {
 			spawner: 0,
 			pattern: pattern,
-			density: density
+			density: density,
+			frequency_ms: frequency_ms,
 		}
 	}
 }
@@ -25,7 +27,7 @@ impl LevelPhase for LevelPhaseBasicSpawn {
 		let height = 16 * 4;
 		let spawn_pos = factory::random_outside_spawn_pos(game_services.draw_context.screen_width(), game_services.draw_context.screen_height());
 		self.spawner = factory::create_entity("",  spawn_pos.0 as i32, spawn_pos.1 as i32, 0, width, height, game_services);
-		let mut spawner_component = SpawnerComponent::new(SpawnerType::POINT, 3000, 50.0, 3, 1.0, std::f32::consts::PI * 2.0, self.pattern);
+		let mut spawner_component = SpawnerComponent::new(SpawnerType::POINT, self.frequency_ms, 50.0, 3, 1.0, std::f32::consts::PI * 2.0, self.pattern);
 		spawner_component.countdown = self.density;
 		game_services.get_world_mut().add_component::<SpawnerComponent>(&self.spawner, spawner_component);
 	}
