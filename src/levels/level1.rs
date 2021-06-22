@@ -1,50 +1,54 @@
-use crate::{core::{common::GameServices}};
-
-use super::{phase_basic_spawn::LevelPhaseBasicSpawn, phases::{LevelPhase, TrajectoryType}};
+use super::{phase_basic_spawn::{LevelPhaseBasicSpawn, SpawnerPositionProperty}, phases::{TrajectoryType}};
 
 pub struct Level1Start {
-	base: LevelPhaseBasicSpawn
 }
 
 
 impl Level1Start {
-	pub fn new() -> Self {
-		Level1Start {
-			base: LevelPhaseBasicSpawn::new(TrajectoryType::BasicDiagonalLeft, 5, 3000)
-		}
+	pub fn new() -> LevelPhaseBasicSpawn {
+		let mut base = LevelPhaseBasicSpawn::new(30.0);
+		let last = base.add(TrajectoryType::BasicDiagonalLeft, 5, 3000, 3, 1.0);
+		last.position_prop = SpawnerPositionProperty::Fixed;
+		//last.luck = 50.0;
+		let last = base.add(TrajectoryType::ReverseDiagonalRight, 5, 3000, 3, 1.0);
+		last.position_prop = SpawnerPositionProperty::Fixed;
+		//last.luck = 50.0;
+		base
 	}
 }
-
-impl LevelPhase for Level1Start {
-	fn on_enter<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
-		self.base.on_enter(game_services)
-	}
-
-	fn update<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>) -> bool {
-		self.base.update(game_services)
-	}
-}
-
-
 pub struct Level1Mid {
-	base: LevelPhaseBasicSpawn
 }
 
 impl Level1Mid {
-	pub fn new() -> Self {
-		Level1Mid {
-			base: LevelPhaseBasicSpawn::new(TrajectoryType::BasicLinear, 8, 1500)
-		}
+	pub fn new() -> LevelPhaseBasicSpawn {
+		let mut base = LevelPhaseBasicSpawn::new(45.0);
+		let last = base.add(TrajectoryType::BasicLinear, 4, 2500, 3, 1.5);
+		last.position_prop = SpawnerPositionProperty::AlternateSymetric;
+		base
 	}
 }
 
-impl LevelPhase for Level1Mid {
-	fn on_enter<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
-		self.base.on_enter(game_services)
-	}
+pub struct Level1Mid2 {
+}
 
-	fn update<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>) -> bool {
-		self.base.update(game_services)
+impl Level1Mid2 {
+	pub fn new() -> LevelPhaseBasicSpawn {
+		let mut base = LevelPhaseBasicSpawn::new(60.0);
+		base.add(TrajectoryType::BasicCircle, 5, 3000, 3, 1.5);
+		base
 	}
 }
 
+pub struct Level1End {
+}
+
+impl Level1End {
+	pub fn new() -> LevelPhaseBasicSpawn {
+		let mut base = LevelPhaseBasicSpawn::new(20.0);
+		let last = base.add(TrajectoryType::CenteredCircle, 8, 2500, 3, 1.0);
+		last.position_prop = SpawnerPositionProperty::Fixed;
+		base.add(TrajectoryType::BasicDiagonalLeft, 2, 5000, 3, 1.5);
+		base.add(TrajectoryType::BasicDiagonalRight, 2, 5000, 3, 1.5);
+		base
+	}
+}

@@ -11,13 +11,15 @@ pub struct SpawnerComponent {
 	pub trajectory_type: TrajectoryType,
 	pub spawner_type: SpawnerType,
 	pub countdown: usize,
+	pub shot_frequency_factor: f32,
 	pub frequency_ms: u32,
 	pub last_spawn_ms: u64,
 	pub luck_percents: f32,
 	pub num: u16,
 	pub propulsion: f32,
 	pub max_angle: f32,
-	pub randomize_pos: bool
+	pub randomize_pos: bool,
+	pub symetric_alternate_pos: bool
 }
 
 impl SpawnerComponent {
@@ -30,8 +32,10 @@ impl SpawnerComponent {
 			num: num,
 			propulsion: propulsion,
 			max_angle: max_angle,
-			randomize_pos: true,
+			randomize_pos: false,
+			symetric_alternate_pos: false,
 			countdown: usize::MAX,
+			shot_frequency_factor: 1.0,
 			trajectory_type: trajectory_type
 		}
 	}

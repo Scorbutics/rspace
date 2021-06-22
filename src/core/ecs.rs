@@ -91,45 +91,6 @@ impl<T: Component + Default> Default for ComponentHolder<T> {
 	}
 }
 
-trait EventObserver<T> {
-	fn on_event_mut(&mut self, data: &T);
-}
-
-type Observer<T> = RwLock<dyn EventObserver<T>>;
-struct EventBusBase<T> {
-	subscribers: Vec<Weak<Observer<T>>>
-}
-
-impl<T> EventBusBase<T> {
-	pub fn new() -> Self {
-		EventBusBase {
-			subscribers: Vec::new()
-		}
-	}
-}
-
-trait EventBus<T> {
-	fn register(&mut self, observer: Arc<Observer<T>>);
-	fn notify(&self, data: &T);
-}
-
-impl<T> EventBus<T> for EventBusBase<T> {
-	fn register(&mut self, observer: Arc<Observer<T>>) {
-		self.subscribers.push(Arc::downgrade(&observer));
-	}
-
-	fn notify(&self, data: &T) {
-		for obs in self.subscribers.iter() {
-			if let Some(listener_rc) = obs.upgrade() {
-				let mut listener = listener_rc.write().unwrap();
-				listener.on_event_mut(&data);
-			} /* else {
-				// SOME LISTENERS ARE NOW DEAD, MUST CLEANUP
-			} */
-		}
-	}
-}
-
 impl EventBus<ComponentEvent> for World {
 	fn register(&mut self, observer: Arc<Observer<ComponentEvent>>) {
 		self.event_bus.register(observer);
@@ -367,7 +328,7 @@ impl World {
 
 use tuple_list::{TupleList};
 
-use super::common::GameServices;
+use super::{common::GameServices, events::{EventBus, EventBusBase, EventObserver, Observer}};
 
 pub trait ComponentMaskSetBit {
 	fn set_bitset(bitset: &mut FixedBitSet);

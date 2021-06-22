@@ -1,6 +1,8 @@
+use std::sync::{Arc, RwLock};
+
 use sdl2::{event::Event, keyboard::Keycode};
 
-use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::{Level1Mid, Level1Start}}};
+use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs, states}, factory, levels::{level::Level, level1::{Level1End, Level1Mid, Level1Mid2, Level1Start}, phase_basic_spawn::LevelPhaseBasicSpawn}};
 
 use super::{background::BackgroundStarField, pause::PauseState};
 
@@ -8,12 +10,12 @@ pub struct PlayingState {
 	player: ecs::EntityId,
 	pause: bool,
 	inputs: [bool; PlayerInput::LAST as usize],
-	levels: Vec<Level>,
+	levels: Vec<Level<LevelPhaseBasicSpawn>>,
 	current_level_index: usize,
-	background: Option<BackgroundStarField>
+	background: Option<Arc<RwLock<BackgroundStarField>>>
 }
 
-impl PlayingState {
+impl  PlayingState  {
 	pub fn new() -> Self {
 		PlayingState {
 			player: 0,
@@ -26,11 +28,11 @@ impl PlayingState {
 	}
 }
 
-impl states::State for PlayingState {
+impl  states::State for PlayingState  {
 	fn on_enter<'sdl_all, 'l>(&mut self, game_services: & mut GameServices<'sdl_all, 'l>, create: bool) {
 		println!("ENTER PLAYING ! {}", create);
 		if create {
-			self.background = Some(BackgroundStarField::new(game_services));
+			self.background = Some(Arc::new(RwLock::new(BackgroundStarField::new(game_services))));
 			let src_width = 16;
 			let src_height = 16;
 			let width = src_width * 4;
@@ -44,7 +46,9 @@ impl states::State for PlayingState {
 			hitbox.hitbox.x += hitbox.hitbox.w / 2;
 			hitbox.hitbox.y += hitbox.hitbox.h / 2;
 
-			self.levels.push(Level::new(vec![Box::new(Level1Start::new()), Box::new(Level1Mid::new()), Box::new(Level1Start::new())]));
+			let level1 = Level::new(vec![Box::new(Level1Start::new()), Box::new(Level1Mid::new()), Box::new(Level1Mid2::new()), Box::new(Level1End::new())], self.background.as_ref().unwrap().clone());
+			self.levels.push(level1);
+			//self.levels.push(Level::new(vec![Box::new(Level1End::new())]));
 		}
 	}
 
@@ -54,20 +58,21 @@ impl states::State for PlayingState {
 			*next_state = pause_state;
 			self.pause = false;
 		}
-		let game_continue = game_services.get_world().is_alive(&self.player);
-		if game_continue {
+		let player_alive = game_services.get_world().is_alive(&self.player);
+		if player_alive {
 			let input = game_services.get_world_mut().get_component_mut::<InputComponent>(&self.player).unwrap();
 			input.inputs = self.inputs.clone();
 		}
 
-		self.background.as_mut().unwrap().update(game_services);
+		self.background.as_mut().unwrap().write().unwrap().update(game_services);
 
 		if self.current_level_index < self.levels.len() {
 			if ! self.levels[self.current_level_index].update(game_services) {
 				self.current_level_index += 1;
 			}
-			game_continue
+			player_alive
 		} else {
+			// Victory if player_alive
 			false
 		}
 	}

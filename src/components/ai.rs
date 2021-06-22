@@ -14,7 +14,8 @@ pub struct TrajectorySequence {
 	shoot_index: usize,
 	pub shoot_num: usize,
 	shoot_delay_ms: u64,
-	pub shoot_interval_ms: u64
+	pub shoot_interval_ms: u64,
+	pub loop_count: u16,
 }
 
 impl TrajectorySequence {
@@ -29,8 +30,9 @@ impl TrajectorySequence {
 			shoot_start_interval_time_ms: 0,
 			shoot_delay_ms: 0,
 			shoot_num: 0,
-			shoot_index: 0,
-			shoot_interval_ms: 300
+			shoot_index: usize::MAX,
+			shoot_interval_ms: 200,
+			loop_count: 1
 		}
 	}
 	pub fn push(&mut self, point: DestinationPoint) {
@@ -41,12 +43,12 @@ impl TrajectorySequence {
 		self.points.last()
 	}
 
-	pub fn can_shoot(&mut self) -> bool {
+	pub fn can_shoot(&mut self, frequency_factor: f32) -> bool {
 		if self.shoot_delay_ms == 0 {
 			return false;
 		}
 		let current_time = common::current_time_ms();
-		let can_start_shoot = (current_time as i64 - self.shoot_start_time_ms as i64) >= self.shoot_delay_ms as i64;
+		let can_start_shoot = (current_time as i64 - self.shoot_start_time_ms as i64) as f32 * frequency_factor >= self.shoot_delay_ms as f32;
 		if can_start_shoot {
 			self.shoot_index = 0;
 			self.shoot_start_time_ms = current_time;
@@ -78,9 +80,11 @@ pub struct AIComponent {
 	trajectories: Vec<TrajectorySequence>,
 	current_trajectory: usize,
 	current_point: usize,
+	current_loop_count: u16,
 	pub state: State,
 	pub last_state: State,
 	pub shot_power: f32,
+	pub shot_frequency_factor: f32,
 	pub speed: f32
 }
 
@@ -90,9 +94,11 @@ impl AIComponent {
 			trajectories: Vec::new(),
 			current_point: 0,
 			current_trajectory: 0,
+			current_loop_count: 1,
 			state: State::Stand,
 			last_state: State::Stand,
 			shot_power: 5.0,
+			shot_frequency_factor: 1.0,
 			speed : 5.0
 		}
 	}
@@ -101,10 +107,15 @@ impl AIComponent {
 			None
 		} else {
 			let pattern = &self.trajectories[self.current_trajectory];
-			if pattern.start_time_ms <= current_time_ms() {
+			if current_time_ms() >= pattern.start_time_ms {
 				if self.current_point >= pattern.points.len() {
-					self.current_trajectory += 1;
 					self.current_point = 0;
+					if self.current_loop_count >= pattern.loop_count {
+						self.current_trajectory += 1;
+						self.current_loop_count = 1;
+					} else {
+						self.current_loop_count += 1;
+					}
 					self.next_position(actual_pos, tolerance)
 				} else {
 					let point = self.current_point;
@@ -132,7 +143,7 @@ impl AIComponent {
 		if self.current_trajectory >= self.trajectories.len() {
 			false
 		} else {
-			self.trajectories[self.current_trajectory].can_shoot()
+			self.trajectories[self.current_trajectory].can_shoot(self.shot_frequency_factor)
 		}
 	}
 }
