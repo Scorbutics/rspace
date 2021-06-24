@@ -1,6 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode};
-
-use crate::core::{common::GameServices, states::State};
+use tuple_list::tuple_list;
+use crate::{core::{common::GameServices, ecs::SystemHolder, states::{self, State, StateWithSystems}}, systems::{animation::AnimationSystem, graphics::GraphicsSystem, input::InputSystem}};
 
 pub struct PauseState {
 	resume: bool
@@ -14,8 +14,12 @@ impl PauseState {
 	}
 }
 
+impl states::StateSystems for PauseState {
+	type Systems = tuple_list!(GraphicsSystem, InputSystem, AnimationSystem);
+}
+
 impl State for PauseState {
-	fn on_enter<'sdl_all, 'l>(&mut self, _game_services: &mut GameServices<'sdl_all,'l>, _create: bool) {
+	fn on_enter<'sdl_all, 'l>(&mut self, _systems: &mut SystemHolder, _game_services: &mut GameServices<'sdl_all,'l>, _create: bool) {
 		println!("GAME PAUSED");
 	}
 
@@ -38,11 +42,11 @@ impl State for PauseState {
 		false
 	}
 
-	fn update<'sdl_all, 'l>(&mut self, _next_state: &mut Option<Box<dyn State>>, _game_services: &mut GameServices<'sdl_all,'l>) -> bool {
+	fn update<'sdl_all, 'l>(&mut self, _next_state: &mut Option<StateWithSystems>, _game_services: &mut GameServices<'sdl_all,'l>) -> bool {
 		! self.resume
 	}
 
 	fn on_leave<'sdl_all, 'l>(&mut self, _game_services: &mut GameServices<'sdl_all,'l>, _destroy: bool) {
-		println!("GAME RESUMED");
+		println!("GAME RESUMED {}", _destroy);
 	}
 }

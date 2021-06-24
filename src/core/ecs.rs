@@ -1,7 +1,6 @@
-use generic_static::StaticTypeMap;
-use once_cell::sync::OnceCell;
 use fixedbitset::FixedBitSet;
-use std::{any::Any, collections::{HashMap, HashSet, hash_set}, sync::{Arc, RwLock, Weak, atomic::{AtomicUsize, Ordering}}};
+use once_cell::sync::OnceCell;
+use std::{any::Any, borrow::Borrow, collections::{HashMap, HashSet, hash_set}, ptr, sync::{Arc, RwLock, Weak, atomic::AtomicUsize}};
 
 const ECS_MAX_COMPONENTS: usize = 100;
 const ECS_MAX_ENTITIES: usize = 10000;
@@ -9,48 +8,32 @@ const ECS_MAX_ENTITIES: usize = 10000;
 type ComponentId = usize;
 pub type EntityId = usize;
 
-pub trait ComponentIdMaker {
-	fn unique_id() -> ComponentId;
-}
-
-impl<T> ComponentIdMaker for T {
-	fn unique_id() -> ComponentId {
-		static COMPONENT_COUNTER : AtomicUsize = AtomicUsize::new(0);
-		let result = COMPONENT_COUNTER.load(Ordering::SeqCst) as ComponentId;
-		COMPONENT_COUNTER.fetch_add(1, Ordering::SeqCst);
-		result
-	}
-}
-
-pub fn build_component_id<T: ComponentIdMaker + 'static>() -> &'static ComponentId {
-	static VALUE: OnceCell<StaticTypeMap<ComponentId>> = OnceCell::new();
-	let map = VALUE.get_or_init(|| StaticTypeMap::new());
-
-	map.call_once::<T, _>(||{
-		T::unique_id()
-	})
-}
 
 pub trait Component: Any + Sized { }
 impl<T: Any> Component for T {}
 
-pub trait Holder {
-	fn is_init(&self) -> bool;
-	fn as_any(&self) -> &dyn Any;
-	fn as_any_mut(&mut self) -> &mut dyn Any;
+impl<T: Component + Default> Initable for ComponentHolder<T> {
+	fn is_init(&self) -> bool {
+		self.init
+	}
+
+	fn init(&mut self) {
+		self.components = Vec::with_capacity(ECS_MAX_ENTITIES);
+		self.components.resize_with(ECS_MAX_ENTITIES, T::default);
+		self.init = true;
+	}
 }
 
-impl<T: Component> Holder for ComponentHolder<T> {
+impl<T: Component + Default> Holder for ComponentHolder<T> {
 	fn as_any(&self) -> &dyn Any {
 		self
 	}
 	fn as_any_mut(&mut self) -> &mut dyn Any {
 		self
 	}
-	fn is_init(&self) -> bool {
-		self.init
-	}
 }
+
+impl<T: Initable + Holder> InitableHolder for T {}
 
 pub struct ComponentHolder<T: Component> {
 	components: Vec<T>,
@@ -72,14 +55,6 @@ impl<T: Component + Default> ComponentHolder<T> {
 		&mut self.components[*entity_id]
 	}
 
-	fn new() -> Self {
-		let mut result = ComponentHolder::<T> {
-			components: Vec::with_capacity(ECS_MAX_ENTITIES),
-			init: true
-		};
-		result.components.resize_with(ECS_MAX_ENTITIES, T::default);
-		result
-	}
 }
 
 impl<T: Component + Default> Default for ComponentHolder<T> {
@@ -99,6 +74,10 @@ impl EventBus<ComponentEvent> for World {
 	fn notify(&self, data: &ComponentEvent) {
 		self.event_bus.notify(data);
 	}
+
+	fn unregister(&mut self, observer: Arc<Observer<ComponentEvent>>) {
+		self.event_bus.unregister(observer)
+	}
 }
 
 struct ComponentEvent {
@@ -108,22 +87,31 @@ struct ComponentEvent {
 	entity_mask: Weak<RwLock<FixedBitSet>>
 }
 
+
+struct SystemHandle {
+	system: Option<Box<dyn Runnable>>,
+	id: Option<*const dyn Runnable>,
+	base: Weak<RwLock<System>>,
+	alive: bool
+}
 pub struct SystemHolder {
-	runnables: Vec<Box<dyn Runnable>>
+	runnables: Vec<Box<dyn Runnable>>,
+	all: HashMap<u64, SystemHandle>
 }
 
 impl SystemHolder {
 	pub fn new() -> Self {
 		SystemHolder {
-			runnables: Vec::new()
+			runnables: Vec::new(),
+			all: HashMap::new()
 		}
 	}
 
 	pub fn add_system<T: Runnable + SystemNewable<T, Args> + SystemComponents + 'static, Args>(&mut self, world: &mut World, args: Args) {
-		let system = System::new::<T::Components>();
-		world.register(system.clone());
-		world.register_system_base(system.clone());
-		self.runnables.push(Box::new(T::new(system.clone(), args)));
+		let base = System::new::<T::Components>();
+		world.register_system_base(base.clone());
+		let id= * meta::numeric_type_id::<T>(&states::SYSTEM_ID_COUNTER) as u64;
+		self.all.insert(id, SystemHandle { id: None, base: Arc::downgrade(&base), system: Some(Box::new(T::new(base.clone(), args))), alive: false });
 	}
 
 	pub fn update<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
@@ -132,19 +120,56 @@ impl SystemHolder {
 			system.run(game_services);
 		}
 	}
+
+	pub fn enable_system(&mut self, world: &mut World, system_id: u64) {
+		if let Some(system) = self.all.get_mut(&system_id) {
+			if ! system.alive {
+				if let Some(base) = system.base.upgrade() {
+					world.register(base.clone());
+				}
+				let t = system.system.as_ref().unwrap();
+				system.id = Some(t.borrow() as *const dyn Runnable);
+				self.runnables.push(system.system.take().unwrap());
+				system.alive = true;
+			}
+		}
+	}
+
+	pub fn disable_system(&mut self, world: &mut World, system_id: u64) {
+		if let Some(system) = self.all.get_mut(&system_id) {
+			if system.alive {
+				if let Some(base) = system.base.upgrade() {
+					world.unregister(base.clone());
+				}
+				let mut index = 0;
+				for (i, run) in self.runnables.iter_mut().enumerate() {
+					let handle_ptr: *const dyn Runnable = run.as_ref();
+					if handle_ptr == system.id.unwrap() {
+						index = i;
+						break;
+					}
+				}
+				system.system = Some(self.runnables.remove(index));
+				system.id = None;
+				system.alive = false;
+			}
+		}
+	}
 }
 
 pub struct World {
 	entities: HashSet<EntityId>,
 	entities_mask: Vec<Arc<RwLock<FixedBitSet>>>,
 	dead_entities: Vec<EntityId>,
-	holders: Vec<Box<dyn Holder>>,
+	holders: Vec<Box<dyn InitableHolder>>,
 	event_bus: EventBusBase<ComponentEvent>,
 	components_remove_queue: HashSet<(EntityId, ComponentId)>,
 	entities_remove_queue: HashSet<EntityId>,
 	events: Vec<ComponentEvent>,
 	bases: HashMap<u64, Arc<RwLock<System>>>
 }
+
+static COMPONENT_ID_COUNTER: IdCounter = IdCounter { cell: OnceCell::new(), atomic: AtomicUsize::new(0) };
 
 impl World {
 	pub fn new() -> Self {
@@ -165,7 +190,7 @@ impl World {
 
 	pub fn get_system_base<T: SystemComponents + 'static>(&self) -> Option<Weak<RwLock<System>>>{
 		let mut imask: u64 = 0;
-		T::Components::set_id(&mut imask);
+		T::Components::set_id(&COMPONENT_ID_COUNTER, &mut imask);
 		let result = self.bases.get(&imask);
 		if result.is_none() {
 			None
@@ -200,8 +225,8 @@ impl World {
 	}
 
 	pub fn add_component<T: Component + Default>(&mut self, entity_id: &EntityId, component: T) {
-		let holder = self.holder_mut::<T>();
-		let component_id = *build_component_id::<T>();
+		let holder = meta::holder_mut::<T, ComponentHolder<T>>(&COMPONENT_ID_COUNTER, &mut self.holders);
+		let component_id = *meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
 		//println!("ID : {}", component_id);
 		holder.add_component(entity_id, component);
 		self.entities_mask[*entity_id].write().unwrap().set(component_id, true);
@@ -249,13 +274,13 @@ impl World {
 
 	pub fn remove_component<T: Component + 'static>(&mut self, entity_id: &EntityId) {
 		if self.has_component::<T>(entity_id) {
-			let component_id = build_component_id::<T>();
+			let component_id = meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
 			self.components_remove_queue.insert((*entity_id, *component_id));
 		}
 	}
 
 	pub fn has_component<T: Component>(&self, entity_id: &EntityId) -> bool {
-		let component_id = build_component_id::<T>();
+		let component_id = meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
 		self.entities_mask[*entity_id].read().unwrap()[*component_id]
 	}
 
@@ -263,7 +288,7 @@ impl World {
 		if ! self.has_component::<T>(entity_id) {
 			Option::None
 		} else {
-			let holder = self.holder::<T>();
+			let holder = meta::holder::<T, ComponentHolder<T>>(&COMPONENT_ID_COUNTER, &self.holders);
 			if holder.is_none() {
 				return None;
 			}
@@ -275,87 +300,18 @@ impl World {
 		if ! self.has_component::<T>(entity_id) {
 			Option::None
 		} else {
-			let holder = self.holder_mut::<T>();
+			let holder = meta::holder_mut::<T, ComponentHolder<T>>(&COMPONENT_ID_COUNTER, &mut self.holders);
 			Option::Some(holder.get_component_mut(entity_id))
 		}
 	}
 
-	fn lazy_init_holder<T: Component + Default>(&mut self) -> ComponentId {
-		let component_id = *build_component_id::<T>();
-		let less = component_id >= self.holders.len();
-		if ! less {
-			if !self.holders[component_id].is_init() {
-				self.holders[component_id] = Box::new(ComponentHolder::<T>::new());
-			}
-			return component_id;
-		}
 
-		while component_id > self.holders.len() {
-			//println!("COMPENSATE HOLDER {}", self.holders.len());
-			self.holders.push(Box::new(ComponentHolder::<T>::default()));
-		}
-		self.holders.push(Box::new(ComponentHolder::<T>::new()));
-		//println!("INIT HOLDER {}", component_id);
-		component_id
-	}
-
-	fn get_holder<T: Component + Default>(&self) -> Option<ComponentId> {
-		let component_id = *build_component_id::<T>();
-		if component_id < self.holders.len() && self.holders[component_id].is_init() {
-			return Some(component_id);
-		}
-		return None;
-	}
-
-	pub fn holder<T: Component + Default>(&self) -> Option<&ComponentHolder<T>> {
-		let component_id = self.get_holder::<T>();
-		if component_id.is_none() {
-			return None;
-		}
-		let result = self.holders.get(component_id.unwrap());
-		let any_box = result.unwrap().as_any();
-		Some(any_box.downcast_ref::<ComponentHolder<T>>().unwrap())
-	}
-
-	pub fn holder_mut<T: Component + Default>(&mut self) -> &mut ComponentHolder<T> {
-		let component_id = self.lazy_init_holder::<T>();
-		let result = self.holders.get_mut(component_id);
-		let any_box = result.unwrap().as_any_mut();
-		any_box.downcast_mut::<ComponentHolder<T>>().unwrap()
-	}
 
 }
 
 use tuple_list::{TupleList};
 
-use super::{common::GameServices, events::{EventBus, EventBusBase, EventObserver, Observer}};
-
-pub trait ComponentMaskSetBit {
-	fn set_bitset(bitset: &mut FixedBitSet);
-	fn set_id(imask: &mut u64);
-}
-
-impl ComponentMaskSetBit for () {
-	fn set_bitset(_bitset: &mut FixedBitSet) {}
-	fn set_id(_imask: &mut u64) {}
-}
-
-impl<Head, Tail> ComponentMaskSetBit for (Head, Tail) where
-	Head: 'static,
-	Tail: ComponentMaskSetBit + TupleList,
-{
-	fn set_bitset(bitset: &mut FixedBitSet) {
-		let component_id = build_component_id::<Head>();
-		bitset.set(*component_id, true);
-		Tail::set_bitset(bitset);
-	}
-
-	fn set_id(imask: &mut u64) {
-		let component_id = build_component_id::<Head>();
-		*imask |= 2u64.pow(*component_id as u32);
-		Tail::set_id(imask)
-	}
-}
+use super::{common::GameServices, events::{EventBus, EventBusBase, EventObserver, Observer}, meta::{self, Holder, IdCounter, Initable, InitableHolder, TypeMaskSetBit}, states};
 
 pub struct System {
 	mask: FixedBitSet,
@@ -368,7 +324,7 @@ pub trait Runnable {
 }
 
 pub trait SystemComponents {
-	type Components: ComponentMaskSetBit + TupleList;
+	type Components: TypeMaskSetBit + TupleList;
 }
 
 pub trait SystemNewable<T, Args> {
@@ -376,14 +332,14 @@ pub trait SystemNewable<T, Args> {
 }
 
 impl System {
-	pub fn new<Components: ComponentMaskSetBit + TupleList>() -> Arc<RwLock<Self>> {
+	pub fn new<Components: TypeMaskSetBit + TupleList>() -> Arc<RwLock<Self>> {
 		let mut system = System {
 			mask: FixedBitSet::with_capacity(ECS_MAX_COMPONENTS),
 			entities: HashSet::new(),
 			id: 0
 		};
-		Components::set_bitset(&mut system.mask);
-		Components::set_id(&mut system.id);
+		Components::set_bitset(&COMPONENT_ID_COUNTER, &mut system.mask);
+		Components::set_id(&COMPONENT_ID_COUNTER, &mut system.id);
 		println!("MASK {}, ID {}", system.mask, system.id);
 		Arc::new(RwLock::new(system))
 	}

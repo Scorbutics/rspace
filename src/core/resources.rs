@@ -14,7 +14,7 @@ where
 	K: Hash + Eq,
 	L: ResourceLoader<'l, R>,
 {
-	loader: &'l L,
+	pub loader: &'l L,
 	cache: Vec<Rc<R>>,
 	index_cache: HashMap<K, usize>,
 	unique_cache: Vec<Box<R>>
@@ -101,16 +101,17 @@ where
 		}
 	}
 
-	/*pub fn make_unique(&mut self, index: usize, copier : Box<dyn Fn(&L, &R) -> R>) -> Option<(&R, usize)> {
-		if let Some(resource) = self.cache.get(index) {
-			let b = Box::new(copier(self.loader, resource.as_ref()));
-			let index = self.unique_cache.len();
-			self.unique_cache.push(b);
-			Some((self.unique_cache.last().unwrap(), index))
+	pub fn take_from_existing(&mut self, resource: Box<R>, existing_texture_index: Option<i64>) -> i64 {
+		if let Some(id) = existing_texture_index {
+			let index = if id > 0 { id } else { -id - 1 } as usize;
+			self.unique_cache[index] = resource;
+			id
 		} else {
-			None
+			let id = self.unique_cache.len() + 1;
+			self.unique_cache.push(resource);
+			-(id as i64)
 		}
-	}*/
+	}
 }
 
 // TextureCreator knows how to load Textures

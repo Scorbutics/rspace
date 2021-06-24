@@ -1,5 +1,4 @@
 use std::borrow::Borrow;
-use std::rc::Rc;
 
 use sdl2::Sdl;
 use sdl2::VideoSubsystem;
@@ -86,9 +85,9 @@ impl<'sdl_all> SdlResourceManager<'sdl_all> {
 		}
 	}
 
-	pub fn load_font(&mut self, font_details: &FontDetails) -> Result<Rc<Font>, String> {
+	pub fn load_font(&mut self, font_details: &FontDetails) -> Result<i64, String> {
 		match self.font_manager.load_shared(font_details) {
-			Ok(t) => Ok(t.0),
+			Ok(t) => Ok(t.1),
 			Err(err) => { return Err(err); },
 		}
 	}
@@ -101,10 +100,31 @@ impl<'sdl_all> SdlResourceManager<'sdl_all> {
 		self.texture_manager.from_index_mut(texture_index)
 	}
 
+	pub fn get_font<'l>(&self, texture_index: i64) -> Option<&Font<'sdl_all, 'l>> {
+		self.font_manager.from_index(texture_index)
+	}
+
 	pub fn load_unique_texture(&mut self, filename: &str) -> Result<i64, String> {
 		match self.texture_manager.load_unique(filename) {
 			Ok(t) => Ok(t.1),
 			Err(err) => { return Err(err); },
+		}
+	}
+
+	pub fn text_to_texture(&mut self, font_index: i64, text: &str, existing_texture_index: Option<i64>) -> Result<(i64, Rect), String> {
+		if let Some(font) = self.get_font(font_index) {
+			let surface = font
+			.render(text)
+			.blended(Color::WHITE)
+			.map_err(|e| e.to_string())?;
+
+			let texture = self.texture_manager.loader
+			.create_texture_from_surface(&surface)
+			.map_err(|e| e.to_string())?;
+
+			Ok((self.texture_manager.take_from_existing(Box::new(texture), existing_texture_index), surface.rect()))
+		} else {
+			Err("Unable to find font with index {}".to_string())
 		}
 	}
 
@@ -118,7 +138,7 @@ pub struct Renderable {
 	pub z: i64,
 	pub flip_horizontal: bool,
 	pub flip_vertical: bool,
-	pub angle_degrees: u64,
+	pub angle_degrees: u64
 }
 
 impl Renderable {

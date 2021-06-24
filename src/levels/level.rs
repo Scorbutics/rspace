@@ -4,7 +4,7 @@ use crate::{core::{common::GameServices, events::{EventBus, EventBusBase, Observ
 
 use super::phases::LevelPhase;
 
-pub struct Level<L : LevelPhase> {
+pub struct Level<L : LevelPhase + 'static> {
 	phases: Vec<Box<L>>,
 	current_phase_index: usize,
 	init: bool,

@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use sdl2::render::BlendMode;
 use tuple_list::tuple_list_type;
 
-use crate::{components::{health::HealthComponent, hitbox::HitboxComponent, lifetime::LifetimeComponent, sprite::SpritesheetOrientation, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{Runnable, System, SystemComponents, SystemNewable}}, factory, maths};
+use crate::{components::{health::{DeathEvent, HealthComponent}, hitbox::HitboxComponent, lifetime::LifetimeComponent, sprite::SpritesheetOrientation, transform::TransformComponent}, core::{common::{self, GameServices}, ecs::{Runnable, System, SystemComponents, SystemNewable}}, factory, maths};
 
 pub struct HealthSystem {
 	base: Arc<RwLock<System>>,
@@ -26,9 +26,11 @@ impl SystemNewable<HealthSystem, ()> for HealthSystem {
 impl Runnable for HealthSystem {
 	fn run<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
 		for entity in self.base.read().unwrap().iter_entities() {
-			let world = game_services.get_world_mut();
-			let health = world.get_component::<HealthComponent>(entity).unwrap();
+			let health = game_services.get_world_mut().get_component::<HealthComponent>(entity).unwrap();
 			if health.health_points <= 0 {
+				let de = DeathEvent { entity: *entity };
+				game_services.event_dispatcher.notify(&de);
+				let world = game_services.get_world_mut();
 				world.remove_entity(entity);
 				let position = maths::center(world, entity);
 				let explosion_sprite = game_services.resource_manager.load_shared_texture("explosion.png").unwrap();

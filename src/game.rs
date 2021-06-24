@@ -9,8 +9,8 @@ use crate::core::ecs::World;
 use crate::core::renderers::SdlDrawContext;
 use crate::core::renderers::SdlRenderer;
 use crate::core::renderers::SdlResourceManager;
-use crate::core::states::State;
 use crate::core::states::StateDispatcher;
+use crate::core::states::StateSystems;
 use crate::sdl2;
 use crate::systems::ai::AISystem;
 use crate::systems::animation::AnimationSystem;
@@ -34,7 +34,7 @@ pub struct Game<'sdl_all, 'game> {
 
 impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 
-	pub fn new(first_state: Box<dyn State>) -> Self {
+	pub fn new<T: StateSystems + 'static>(first_state: Box<T>) -> Self {
 		let mut game = Game {
 			world: World::new(),
 			systems: SystemHolder::new(),
@@ -64,7 +64,7 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 		self.resource_manager = Some(SdlResourceManager::new(draw_context, texture_creator));
 
 		self.game_services = Some(GameServices::new(&mut self.world, self.resource_manager.as_mut().unwrap(), self.renderer.as_mut().unwrap(), draw_context));
-		self.state.update(self.game_services.as_mut().unwrap());
+		self.state.update(&mut self.systems, self.game_services.as_mut().unwrap());
 
 		let mut event_pump = draw_context.event_pump()?;
 		let mut frame: u32 = 0;
@@ -80,7 +80,7 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 			if frame >= 30 {
 				let game_services = self.game_services.as_mut().unwrap();
 				self.systems.update(game_services);
-				if ! self.state.update(game_services) {
+				if ! self.state.update(&mut self.systems, game_services) {
 					break 'running;
 				}
 				game_services.renderer.update(game_services.resource_manager);

@@ -5,3 +5,4 @@ pub mod resources;
 pub mod states;
 pub mod animation;
 pub mod events;
+pub mod meta;
