@@ -1,6 +1,6 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{time::{SystemTime, UNIX_EPOCH}};
 
-use super::{ecs::World, events::EventDispatcher, renderers::{SdlDrawContext, SdlRenderer, SdlResourceManager}};
+use super::{ecs::{World}, events::EventDispatcher, renderers::{SdlDrawContext, SdlRenderer, SdlResourceManager}};
 
 pub struct GameServices<'sdl_all, 'parent> {
 	world: &'parent mut World,
@@ -17,7 +17,7 @@ impl<'sdl_all, 'parent> GameServices<'sdl_all, 'parent> {
 			resource_manager: resource_manager,
 			renderer: renderer,
 			draw_context: draw_context,
-			event_dispatcher: EventDispatcher::new()
+			event_dispatcher: EventDispatcher::new(),
 		}
 	}
 

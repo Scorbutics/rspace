@@ -17,7 +17,7 @@ where
 	pub loader: &'l L,
 	cache: Vec<Rc<R>>,
 	index_cache: HashMap<K, usize>,
-	unique_cache: Vec<Box<R>>
+	unique_cache: Vec<Option<Box<R>>>
 }
 
 impl<'l, K, R, L> ResourceManager<'l, K, R, L>
@@ -64,15 +64,23 @@ where
 	{
 		let resource = Box::new(self.loader.load(details)?);
 		let index = self.unique_cache.len();
-		self.unique_cache.push(resource);
+		self.unique_cache.push(Some(resource));
 		//println!("UNIQUE {}", - (index as i64) - 1);
-		Ok((self.unique_cache.last().unwrap(), - (index as i64) - 1))
+		Ok((self.unique_cache.last().as_ref().unwrap().as_ref().unwrap(), - (index as i64) - 1))
+	}
+
+	pub fn remove_unique(&mut self, index: i64) {
+		self.unique_cache[i64::abs(index + 1) as usize] = None;
 	}
 
 	pub fn from_index(&self, index: i64) -> Option<&R> {
 		if index < 0 {
 			if let Some(resource) = self.unique_cache.get(i64::abs(index + 1) as usize) {
-				Some(resource.as_ref().borrow())
+				if resource.is_some() {
+					Some(resource.as_ref().unwrap().borrow())
+				} else {
+					None
+				}
 			} else {
 				None
 			}
@@ -88,7 +96,11 @@ where
 	pub fn from_index_mut(&mut self, index: i64) -> Option<&mut R> {
 		if index < 0 {
 			if let Some(resource) = self.unique_cache.get_mut(i64::abs(index + 1) as usize) {
-				Some(resource.as_mut())
+				if resource.is_some() {
+					Some(resource.as_mut().unwrap())
+				} else {
+					None
+				}
 			} else {
 				None
 			}
@@ -104,11 +116,11 @@ where
 	pub fn take_from_existing(&mut self, resource: Box<R>, existing_texture_index: Option<i64>) -> i64 {
 		if let Some(id) = existing_texture_index {
 			let index = if id > 0 { id } else { -id - 1 } as usize;
-			self.unique_cache[index] = resource;
+			self.unique_cache[index] = Some(resource);
 			id
 		} else {
 			let id = self.unique_cache.len() + 1;
-			self.unique_cache.push(resource);
+			self.unique_cache.push(Some(resource));
 			-(id as i64)
 		}
 	}

@@ -1,9 +1,9 @@
 use std::sync::{Arc, RwLock};
 
 use sdl2::{event::Event, keyboard::Keycode};
-use tuple_list::tuple_list;
+use tuple_list::{tuple_list_type};
 
-use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs::{self, SystemHolder}, states::{self, StateWithSystems}}, factory, levels::{level::Level, level1::{Level1End, Level1Mid, Level1Mid2, Level1Start}, phase_basic_spawn::LevelPhaseBasicSpawn}, systems::{ai::AISystem, animation::AnimationSystem, followme::FollowMeSystem, graphics::GraphicsSystem, health::HealthSystem, input::InputSystem, lifetime::LifetimeSystem, physics::PhysicsSystem, shot::ShotSystem, spawner::SpawnMobSystem}};
+use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs::{self, WeakRunnable, make_shared_runnable}, states::{self, StateWithSystems}}, factory, levels::{level::Level, level1::{Level1End, Level1Mid, Level1Mid2, Level1Start}, phase_basic_spawn::LevelPhaseBasicSpawn}, systems::{ai::AISystem, animation::AnimationSystem, graphics::GraphicsSystem, health::HealthSystem, input::InputSystem, lifetime::LifetimeSystem, physics::PhysicsSystem, shot::ShotSystem, spawner::SpawnMobSystem}};
 
 use super::{background::BackgroundStarField, pause::PauseState, score::ScoreHandler};
 
@@ -32,27 +32,16 @@ impl PlayingState  {
 }
 
 impl states::StateSystems for PlayingState {
-	type Systems = tuple_list!(GraphicsSystem, InputSystem, PhysicsSystem, ShotSystem, LifetimeSystem, SpawnMobSystem, FollowMeSystem, AISystem, HealthSystem, AnimationSystem);
+	type Systems = tuple_list_type!(GraphicsSystem, InputSystem, PhysicsSystem, ShotSystem, LifetimeSystem, SpawnMobSystem, AISystem, HealthSystem, AnimationSystem);
 }
 
 impl states::State for PlayingState  {
-	fn on_enter<'sdl_all, 'l>(&mut self, _systems: &mut SystemHolder, game_services: & mut GameServices<'sdl_all, 'l>, create: bool) {
+	fn on_enter<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: & mut GameServices<'sdl_all, 'l>, create: bool) {
 		println!("ENTER PLAYING ! {}", create);
 		if create {
-			/*
-			systems.add_system::<GraphicsSystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<InputSystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<PhysicsSystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<ShotSystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<LifetimeSystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<SpawnMobSystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<FollowMeSystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<AISystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<HealthSystem, ()>(game_services.get_world_mut(), ());
-			systems.add_system::<AnimationSystem, ()>(game_services.get_world_mut(), ());
-			*/
 
 			self.background = Some(Arc::new(RwLock::new(BackgroundStarField::new(game_services))));
+			runnables.push(Arc::downgrade(&make_shared_runnable(self.background.as_ref().unwrap().clone())));
 			self.score_handler = Some(Arc::new(RwLock::new(ScoreHandler::new(game_services.resource_manager))));
 			let src_width = 16;
 			let src_height = 16;
@@ -62,10 +51,14 @@ impl states::State for PlayingState  {
 			let y = (game_services.draw_context.screen_height() - height - 5) as i32;
 			self.player = factory::create_player("spaceship.png", x, y, 0, width, height, 10.0, game_services);
 			let hitbox = game_services.get_world_mut().get_component_mut::<HitboxComponent>(&self.player).unwrap();
-			hitbox.hitbox.w /= 2;
-			hitbox.hitbox.h /= 2;
 			hitbox.hitbox.x += hitbox.hitbox.w / 2;
 			hitbox.hitbox.y += hitbox.hitbox.h / 2;
+
+			hitbox.hitbox.w /= 8;
+			hitbox.hitbox.h /= 8;
+
+			hitbox.hitbox.x -= hitbox.hitbox.w / 2;
+			hitbox.hitbox.y -= hitbox.hitbox.h / 2;
 
 			let level1 = Level::new(vec![Box::new(Level1Start::new()), Box::new(Level1Mid::new()), Box::new(Level1Mid2::new()), Box::new(Level1End::new())], self.background.as_ref().unwrap().clone());
 			self.levels.push(level1);
@@ -88,7 +81,7 @@ impl states::State for PlayingState  {
 			}
 		}
 
-		self.background.as_mut().unwrap().write().unwrap().update(game_services);
+		//self.background.as_mut().unwrap().write().unwrap().update(game_services);
 		self.score_handler.as_mut().unwrap().write().unwrap().update(&mut game_services.resource_manager, &mut game_services.renderer);
 
 		if self.current_level_index < self.levels.len() {
@@ -108,6 +101,8 @@ impl states::State for PlayingState  {
 	fn on_leave<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>, destroy: bool) {
 		println!("LEAVE PLAYING ! {}", destroy);
 		if destroy {
+			self.background = None;
+			self.score_handler = None;
 			game_services.get_world_mut().remove_entity(&self.player);
 		}
 	}

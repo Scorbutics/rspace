@@ -4,7 +4,9 @@ use sdl2::video::Window;
 use sdl2::video::WindowContext;
 
 use crate::core::common::GameServices;
+use crate::core::ecs::Runnable;
 use crate::core::ecs::SystemHolder;
+use crate::core::ecs::WeakRunnable;
 use crate::core::ecs::World;
 use crate::core::renderers::SdlDrawContext;
 use crate::core::renderers::SdlRenderer;
@@ -14,7 +16,6 @@ use crate::core::states::StateSystems;
 use crate::sdl2;
 use crate::systems::ai::AISystem;
 use crate::systems::animation::AnimationSystem;
-use crate::systems::followme::FollowMeSystem;
 use crate::systems::graphics::GraphicsSystem;
 use crate::systems::health::HealthSystem;
 use crate::systems::input::InputSystem;
@@ -29,7 +30,12 @@ pub struct Game<'sdl_all, 'game> {
 	state: StateDispatcher,
 	renderer: Option<SdlRenderer>,
 	resource_manager: Option<SdlResourceManager<'sdl_all>>,
-	game_services: Option<GameServices<'sdl_all, 'game>>
+	game_services: Option<GameServices<'sdl_all, 'game>>,
+	global_runnables: Vec<WeakRunnable>
+}
+
+pub trait RunnableNewable : Runnable {
+	fn new<'sdl_all, 'game>(game_services: &mut GameServices<'sdl_all, 'game>) -> Self;
 }
 
 impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
@@ -41,7 +47,8 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 			state: StateDispatcher::new(),
 			renderer: Option::None,
 			resource_manager: Option::None,
-			game_services: Option::None
+			game_services: Option::None,
+			global_runnables: Vec::new()
 		};
 		game.state.enqueue_state(first_state);
 		game.systems.add_system::<GraphicsSystem, ()>(&mut game.world, ());
@@ -50,11 +57,23 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 		game.systems.add_system::<ShotSystem, ()>(&mut game.world, ());
 		game.systems.add_system::<LifetimeSystem, ()>(&mut game.world, ());
 		game.systems.add_system::<SpawnMobSystem, ()>(&mut game.world, ());
-		game.systems.add_system::<FollowMeSystem, ()>(&mut game.world, ());
 		game.systems.add_system::<AISystem, ()>(&mut game.world, ());
 		game.systems.add_system::<HealthSystem, ()>(&mut game.world, ());
 		game.systems.add_system::<AnimationSystem, ()>(&mut game.world, ());
 		game
+	}
+
+	fn update_global_runnables<'l>(global_runnables: &mut Vec<WeakRunnable>, game_services: &mut GameServices<'sdl_all, 'l>) {
+		let mut i = 0;
+		while i < global_runnables.len() {
+			let w_runnable = &mut global_runnables[i];
+			if let Some(runnable) = w_runnable.upgrade() {
+				runnable.write().unwrap().run(game_services);
+				i += 1;
+			} else {
+				global_runnables.remove(i);
+			}
+		}
 	}
 
 	pub fn run(&'game mut self, canvas: Canvas<Window>, draw_context: &'sdl_all SdlDrawContext, texture_creator: &'sdl_all TextureCreator<WindowContext>) -> Result<(), String> {
@@ -64,7 +83,7 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 		self.resource_manager = Some(SdlResourceManager::new(draw_context, texture_creator));
 
 		self.game_services = Some(GameServices::new(&mut self.world, self.resource_manager.as_mut().unwrap(), self.renderer.as_mut().unwrap(), draw_context));
-		self.state.update(&mut self.systems, self.game_services.as_mut().unwrap());
+		self.state.update(&mut self.systems, &mut self.global_runnables, self.game_services.as_mut().unwrap());
 
 		let mut event_pump = draw_context.event_pump()?;
 		let mut frame: u32 = 0;
@@ -77,10 +96,12 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 			}
 
 			// update the game loop here
+			// TODO time dependent
 			if frame >= 30 {
 				let game_services = self.game_services.as_mut().unwrap();
 				self.systems.update(game_services);
-				if ! self.state.update(&mut self.systems, game_services) {
+				Self::update_global_runnables(&mut self.global_runnables, game_services);
+				if ! self.state.update(&mut self.systems, &mut self.global_runnables, game_services) {
 					break 'running;
 				}
 				game_services.renderer.update(game_services.resource_manager);

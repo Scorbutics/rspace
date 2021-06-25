@@ -1,6 +1,6 @@
 use fixedbitset::FixedBitSet;
 use once_cell::sync::OnceCell;
-use std::{any::Any, borrow::Borrow, collections::{HashMap, HashSet, hash_set}, ptr, sync::{Arc, RwLock, Weak, atomic::AtomicUsize}};
+use std::{any::Any, borrow::Borrow, collections::{HashMap, HashSet, hash_set}, sync::{Arc, RwLock, Weak, atomic::AtomicUsize}};
 
 const ECS_MAX_COMPONENTS: usize = 100;
 const ECS_MAX_ENTITIES: usize = 10000;
@@ -91,7 +91,6 @@ struct ComponentEvent {
 struct SystemHandle {
 	system: Option<Box<dyn Runnable>>,
 	id: Option<*const dyn Runnable>,
-	base: Weak<RwLock<System>>,
 	alive: bool
 }
 pub struct SystemHolder {
@@ -110,8 +109,9 @@ impl SystemHolder {
 	pub fn add_system<T: Runnable + SystemNewable<T, Args> + SystemComponents + 'static, Args>(&mut self, world: &mut World, args: Args) {
 		let base = System::new::<T::Components>();
 		world.register_system_base(base.clone());
+		world.register(base.clone());
 		let id= * meta::numeric_type_id::<T>(&states::SYSTEM_ID_COUNTER) as u64;
-		self.all.insert(id, SystemHandle { id: None, base: Arc::downgrade(&base), system: Some(Box::new(T::new(base.clone(), args))), alive: false });
+		self.all.insert(id, SystemHandle { id: None, system: Some(Box::new(T::new(base.clone(), args))), alive: false });
 	}
 
 	pub fn update<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
@@ -121,12 +121,9 @@ impl SystemHolder {
 		}
 	}
 
-	pub fn enable_system(&mut self, world: &mut World, system_id: u64) {
+	pub fn enable_system(&mut self, _world: &mut World, system_id: u64) {
 		if let Some(system) = self.all.get_mut(&system_id) {
 			if ! system.alive {
-				if let Some(base) = system.base.upgrade() {
-					world.register(base.clone());
-				}
 				let t = system.system.as_ref().unwrap();
 				system.id = Some(t.borrow() as *const dyn Runnable);
 				self.runnables.push(system.system.take().unwrap());
@@ -135,12 +132,9 @@ impl SystemHolder {
 		}
 	}
 
-	pub fn disable_system(&mut self, world: &mut World, system_id: u64) {
+	pub fn disable_system(&mut self, _world: &mut World, system_id: u64) {
 		if let Some(system) = self.all.get_mut(&system_id) {
 			if system.alive {
-				if let Some(base) = system.base.upgrade() {
-					world.unregister(base.clone());
-				}
 				let mut index = 0;
 				for (i, run) in self.runnables.iter_mut().enumerate() {
 					let handle_ptr: *const dyn Runnable = run.as_ref();
@@ -323,6 +317,13 @@ pub trait Runnable {
 	fn run<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>);
 }
 
+pub type SharedRunnable =  Arc<RwLock<dyn Runnable>>;
+pub type WeakRunnable =  Weak<RwLock<dyn Runnable>>;
+pub type SharedGRunnable<T> = Arc<RwLock<T>>;
+
+pub fn make_shared_runnable<T: Runnable + 'static>(runnable: SharedGRunnable<T>) -> SharedRunnable {
+	runnable
+}
 pub trait SystemComponents {
 	type Components: TypeMaskSetBit + TupleList;
 }

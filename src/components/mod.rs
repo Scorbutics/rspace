@@ -6,7 +6,6 @@ pub mod sprite;
 pub mod transform;
 pub mod lifetime;
 pub mod spawner;
-pub mod followme;
 pub mod ai;
 pub mod health;
 pub mod animation;

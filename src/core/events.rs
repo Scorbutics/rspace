@@ -62,13 +62,18 @@ impl<T> EventBus<T> for EventBusBase<T> {
 	}
 
 	fn notify(&self, data: &T) {
-		for obs in self.subscribers.iter() {
+		let mut i = 0;
+		while i < self.subscribers.len() {
+			let obs = &self.subscribers[i];
 			if let Some(listener_rc) = obs.upgrade() {
 				let mut listener = listener_rc.write().unwrap();
 				listener.on_event_mut(&data);
-			} /* else {
-				// SOME LISTENERS ARE NOW DEAD, MUST CLEANUP
-			} */
+				i += 1;
+			}
+			// TODO : must be mutable...
+			/*else {
+				self.subscribers.remove(i);
+			}*/
 		}
 	}
 }

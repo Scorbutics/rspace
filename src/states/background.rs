@@ -1,7 +1,7 @@
 use fastapprox::{fast};
 use sdl2::{pixels::Color, rect::Rect, render::BlendMode};
 
-use crate::{core::{common::{self, GameServices}, events::EventObserver, renderers::Renderable}, levels::{phase_basic_spawn::LevelPhaseBasicSpawn}};
+use crate::{core::{common::{self, GameServices}, ecs::Runnable, events::EventObserver, renderers::Renderable}, levels::{phase_basic_spawn::LevelPhaseBasicSpawn}};
 
 pub struct BackgroundStarField {
 	src_width: u32,
@@ -89,8 +89,10 @@ impl BackgroundStarField {
 		}
 		layer_to_refresh
 	}
+}
 
-	pub fn update<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
+impl Runnable for BackgroundStarField {
+	fn run<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
 		for (index, texture_index) in self.texture_index_layers.iter().enumerate() {
 			let z = if index == 0 {
 				9999
@@ -107,10 +109,9 @@ impl BackgroundStarField {
 		let fade_percents = fast::cos((frequency  % (2.0 * std::f64::consts::PI)) as f32);
 		game_services.renderer.set_draw_color(Self::color_mix_rgb(&self.color_start, &self.color_end, 150, fade_percents));
 	}
-
 }
 
-impl<'playing_state>  EventObserver<LevelPhaseBasicSpawn> for BackgroundStarField {
+impl EventObserver<LevelPhaseBasicSpawn> for BackgroundStarField {
 	fn on_event_mut(&mut self, data: &LevelPhaseBasicSpawn) {
 		self.next_scroll_speed_ms = (30.0 / data.hyperspace_speed) * 30.0;
 	}

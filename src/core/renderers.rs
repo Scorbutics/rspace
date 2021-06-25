@@ -111,6 +111,10 @@ impl<'sdl_all> SdlResourceManager<'sdl_all> {
 		}
 	}
 
+	pub fn remove_unique_texture(&mut self, texture_index: i64) {
+		self.texture_manager.remove_unique(texture_index)
+	}
+
 	pub fn text_to_texture(&mut self, font_index: i64, text: &str, existing_texture_index: Option<i64>) -> Result<(i64, Rect), String> {
 		if let Some(font) = self.get_font(font_index) {
 			let surface = font

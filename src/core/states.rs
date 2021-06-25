@@ -1,4 +1,4 @@
-use std::sync::atomic::AtomicUsize;
+use std::sync::{atomic::AtomicUsize};
 
 use crate::sdl2;
 use fixedbitset::FixedBitSet;
@@ -6,10 +6,10 @@ use once_cell::sync::OnceCell;
 use sdl2::event::Event;
 use tuple_list::TupleList;
 
-use super::{common::GameServices, ecs::SystemHolder, meta::{self, IdCounter, TypeMaskSetBit}};
+use super::{common::GameServices, ecs::{SystemHolder, WeakRunnable}, meta::{self, IdCounter, TypeMaskSetBit}};
 
 pub trait State {
-	fn on_enter<'sdl_all, 'l>(&mut self, systems: &mut SystemHolder, game_services: &mut GameServices<'sdl_all,'l>, create: bool);
+	fn on_enter<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: &mut GameServices<'sdl_all,'l>, create: bool);
 	fn on_event(&mut self, event: &Event) -> bool;
 	fn update<'sdl_all, 'l>(&mut self, next_state: &mut Option<StateWithSystems>, game_services: &mut GameServices<'sdl_all,'l>) -> bool;
 	fn on_leave<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>, destroy: bool);
@@ -71,20 +71,16 @@ impl StateDispatcher {
 		}
 	}
 
-	fn top_state(&mut self) -> Option<&StateWithSystems> {
-		if let Some(last) = self.states_ids.last() {
-			self.states[*last].as_ref()
-		} else {
-			None
-		}
-	}
-
 	fn top_state_id(&self) -> Option<&usize> {
 		self.states_ids.last()
 	}
 
 	fn top_previous_state_id(&self) -> Option<&usize> {
-		self.states_ids.get(self.states_ids.len() - 2)
+		if self.states_ids.len() < 2 {
+			None
+		} else {
+			self.states_ids.get(self.states_ids.len() - 2)
+		}
 	}
 
 	fn pop_state(&mut self) -> Option<StateWithSystems> {
@@ -136,19 +132,19 @@ impl StateDispatcher {
 		}
 	}
 
-	fn resume_state<'sdl_all, 'l>(&mut self, systems: &mut SystemHolder, game_services: &mut GameServices<'sdl_all,'l>, create: bool) {
+	fn resume_state<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: &mut GameServices<'sdl_all,'l>, create: bool) {
 		println!("RESUMING STATE (total states {})", self.states_ids.len());
 		if let Some(next_state) = self.top_state_mut() {
-			next_state.state.on_enter(systems, game_services, create);
+			next_state.state.on_enter(runnables, game_services, create);
 		}
 	}
 
-	pub fn update<'sdl_all, 'l>(&mut self, systems: &mut SystemHolder, game_services: &mut GameServices<'sdl_all,'l>) -> bool {
+	pub fn update<'sdl_all, 'l>(&mut self, systems: &mut SystemHolder, runnables: &mut Vec<WeakRunnable>, game_services: &mut GameServices<'sdl_all,'l>) -> bool {
 		if let Some(next_state) = self.next_state.take() {
 			let last_state_id = self.pause_current_state(game_services, false);
 			self.push_state(next_state);
 			self.refresh_systems(systems, game_services, last_state_id.as_ref(), *self.top_state_id().unwrap());
-			self.resume_state(systems, game_services, true);
+			self.resume_state(runnables, game_services, true);
 		}
 
 		if let Some(last_id) = self.states_ids.last() {
@@ -157,10 +153,15 @@ impl StateDispatcher {
 			let state_continue = current_state.state.update(n, game_services);
 			if ! state_continue {
 				let last_state_id = self.pause_current_state(game_services, true);
-				self.refresh_systems(systems, game_services, last_state_id.as_ref(), *self.top_previous_state_id().unwrap());
+				let mut no_more_state = true;
+				if let Some(next_state_id)  = self.top_previous_state_id() {
+					let n = *next_state_id;
+					no_more_state = false;
+					self.refresh_systems(systems, game_services, last_state_id.as_ref(), n);
+				}
 				self.pop_state();
-				self.resume_state(systems, game_services, false);
-				true
+				self.resume_state(runnables, game_services, false);
+				! no_more_state
 			} else {
 				true
 			}
