@@ -69,6 +69,8 @@ impl<T> EventBus<T> for EventBusBase<T> {
 				let mut listener = listener_rc.write().unwrap();
 				listener.on_event_mut(&data);
 				i += 1;
+			} else {
+				i += 1;
 			}
 			// TODO : must be mutable...
 			/*else {
@@ -93,6 +95,11 @@ impl EventDispatcher {
 	pub fn register<T: 'static>(&mut self, observer: Arc<Observer<T>>) {
 		let holder = meta::holder_mut::<T, EventBusBase<T>>(&EVENT_ID_COUNTER, &mut self.holders);
 		holder.register(observer)
+	}
+
+	pub fn unregister<T: 'static>(&mut self, observer: Arc<Observer<T>>) {
+		let holder = meta::holder_mut::<T, EventBusBase<T>>(&EVENT_ID_COUNTER, &mut self.holders);
+		holder.unregister(observer)
 	}
 
 	pub fn notify<T: 'static>(&self, data: &T) {

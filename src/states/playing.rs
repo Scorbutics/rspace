@@ -3,9 +3,9 @@ use std::sync::{Arc, RwLock};
 use sdl2::{event::Event, keyboard::Keycode};
 use tuple_list::{tuple_list_type};
 
-use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs::{self, WeakRunnable, make_shared_runnable}, states::{self, StateWithSystems}}, factory, levels::{level::Level, level1::{Level1End, Level1Mid, Level1Mid2, Level1Start}, phase_basic_spawn::LevelPhaseBasicSpawn}, systems::{ai::AISystem, animation::AnimationSystem, graphics::GraphicsSystem, health::HealthSystem, input::InputSystem, lifetime::LifetimeSystem, physics::PhysicsSystem, shot::ShotSystem, spawner::SpawnMobSystem}};
+use crate::{components::{hitbox::HitboxComponent, input::{InputComponent, PlayerInput}}, core::{common::GameServices, ecs::{self, WeakRunnable, make_shared_runnable}, meta, states::{self, STATE_ID_COUNTER, StateWithSystems}}, factory, levels::{level::Level, level1::{Level1End, Level1Mid, Level1Mid2, Level1Start}, phase_basic_spawn::LevelPhaseBasicSpawn}, systems::{ai::AISystem, animation::AnimationSystem, graphics::GraphicsSystem, health::HealthSystem, input::InputSystem, lifetime::LifetimeSystem, physics::PhysicsSystem, shot::ShotSystem, spawner::SpawnMobSystem}};
 
-use super::{background::BackgroundStarField, pause::PauseState, score::ScoreHandler};
+use super::{background::BackgroundStarField, gameover::GameOverState, pause::PauseState, score::ScoreHandler};
 
 pub struct PlayingState {
 	player: ecs::EntityId,
@@ -29,6 +29,10 @@ impl PlayingState  {
 			score_handler: None,
 		}
 	}
+
+	fn get_current_score(&self) -> u32 {
+		self.score_handler.as_ref().unwrap().read().unwrap().score()
+	}
 }
 
 impl states::StateSystems for PlayingState {
@@ -36,10 +40,16 @@ impl states::StateSystems for PlayingState {
 }
 
 impl states::State for PlayingState  {
-	fn on_enter<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: & mut GameServices<'sdl_all, 'l>, create: bool) {
-		println!("ENTER PLAYING ! {}", create);
-		if create {
+	fn on_enter<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: & mut GameServices<'sdl_all, 'l>, create: bool, last_state_id: Option<usize>) {
+		if !create && last_state_id.is_some() && *meta::numeric_type_id::<GameOverState>(&STATE_ID_COUNTER) == last_state_id.unwrap() {
+			self.on_leave(game_services, true);
+			self.on_enter(runnables, game_services, true, None);
+			return;
+		}
 
+		println!("ENTER PLAYING ! {}", create);
+
+		if create {
 			self.background = Some(Arc::new(RwLock::new(BackgroundStarField::new(game_services))));
 			runnables.push(Arc::downgrade(&make_shared_runnable(self.background.as_ref().unwrap().clone())));
 			self.score_handler = Some(Arc::new(RwLock::new(ScoreHandler::new(game_services.resource_manager))));
@@ -52,13 +62,13 @@ impl states::State for PlayingState  {
 			self.player = factory::create_player("spaceship.png", x, y, 0, width, height, 10.0, game_services);
 			let hitbox = game_services.get_world_mut().get_component_mut::<HitboxComponent>(&self.player).unwrap();
 			hitbox.hitbox.x += hitbox.hitbox.w / 2;
-			hitbox.hitbox.y += hitbox.hitbox.h / 2;
+			hitbox.hitbox.y += hitbox.hitbox.h;
 
 			hitbox.hitbox.w /= 8;
 			hitbox.hitbox.h /= 8;
 
 			hitbox.hitbox.x -= hitbox.hitbox.w / 2;
-			hitbox.hitbox.y -= hitbox.hitbox.h / 2;
+			hitbox.hitbox.y -= hitbox.hitbox.h;
 
 			let level1 = Level::new(vec![Box::new(Level1Start::new()), Box::new(Level1Mid::new()), Box::new(Level1Mid2::new()), Box::new(Level1End::new())], self.background.as_ref().unwrap().clone());
 			self.levels.push(level1);
@@ -79,6 +89,10 @@ impl states::State for PlayingState  {
 			if let Some(input) = game_services.get_world_mut().get_component_mut::<InputComponent>(&self.player) {
 				input.inputs = self.inputs.clone();
 			}
+		} else {
+			println!("PLAYER DEAD");
+			let game_over_state: Option<StateWithSystems> = Some(StateWithSystems::new(Box::new(GameOverState::new(false, self.get_current_score()))));
+			*next_state = game_over_state;
 		}
 
 		//self.background.as_mut().unwrap().write().unwrap().update(game_services);
@@ -88,22 +102,26 @@ impl states::State for PlayingState  {
 			if ! self.levels[self.current_level_index].update(game_services) {
 				self.current_level_index += 1;
 			}
-			player_alive
+			true
 		} else {
+			// No more levels
 			// Victory if player_alive
-			if player_alive {
-				println!("No more levels.");
-			}
-			false
+			let game_over_state: Option<StateWithSystems> = Some(StateWithSystems::new(Box::new(GameOverState::new(player_alive, self.get_current_score()))));
+			*next_state = game_over_state;
+			true
 		}
 	}
 
 	fn on_leave<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>, destroy: bool) {
 		println!("LEAVE PLAYING ! {}", destroy);
 		if destroy {
+			game_services.event_dispatcher.unregister(self.score_handler.as_ref().unwrap().clone());
 			self.background = None;
 			self.score_handler = None;
-			game_services.get_world_mut().remove_entity(&self.player);
+			self.current_level_index = 0;
+			self.levels.clear();
+
+			game_services.get_world_mut().reset();
 		}
 	}
 

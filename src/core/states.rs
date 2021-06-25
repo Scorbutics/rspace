@@ -9,7 +9,7 @@ use tuple_list::TupleList;
 use super::{common::GameServices, ecs::{SystemHolder, WeakRunnable}, meta::{self, IdCounter, TypeMaskSetBit}};
 
 pub trait State {
-	fn on_enter<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: &mut GameServices<'sdl_all,'l>, create: bool);
+	fn on_enter<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: &mut GameServices<'sdl_all,'l>, create: bool, last_state_id: Option<usize>);
 	fn on_event(&mut self, event: &Event) -> bool;
 	fn update<'sdl_all, 'l>(&mut self, next_state: &mut Option<StateWithSystems>, game_services: &mut GameServices<'sdl_all,'l>) -> bool;
 	fn on_leave<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all,'l>, destroy: bool);
@@ -28,12 +28,13 @@ pub struct StateWithSystems {
 }
 
 pub static SYSTEM_ID_COUNTER: IdCounter = IdCounter { cell: OnceCell::new(), atomic: AtomicUsize::new(0) };
+pub static STATE_ID_COUNTER: IdCounter = IdCounter { cell: OnceCell::new(), atomic: AtomicUsize::new(0) };
 
 impl StateWithSystems {
 	pub fn new<T: State + StateSystems + 'static>(state: Box<T>) -> Self {
 		let mut mask = FixedBitSet::with_capacity(STATES_MAX_SYSTEMS);
 		T::Systems::set_bitset(&SYSTEM_ID_COUNTER, &mut mask);
-		let id = meta::numeric_type_id::<T>(&SYSTEM_ID_COUNTER);
+		let id = meta::numeric_type_id::<T>(&STATE_ID_COUNTER);
 		StateWithSystems {
 			state: state,
 			mask: mask,
@@ -132,10 +133,10 @@ impl StateDispatcher {
 		}
 	}
 
-	fn resume_state<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: &mut GameServices<'sdl_all,'l>, create: bool) {
+	fn resume_state<'sdl_all, 'l>(&mut self, runnables: &mut Vec<WeakRunnable>, game_services: &mut GameServices<'sdl_all,'l>, create: bool, last_state_id: Option<usize>) {
 		println!("RESUMING STATE (total states {})", self.states_ids.len());
 		if let Some(next_state) = self.top_state_mut() {
-			next_state.state.on_enter(runnables, game_services, create);
+			next_state.state.on_enter(runnables, game_services, create, last_state_id);
 		}
 	}
 
@@ -144,7 +145,7 @@ impl StateDispatcher {
 			let last_state_id = self.pause_current_state(game_services, false);
 			self.push_state(next_state);
 			self.refresh_systems(systems, game_services, last_state_id.as_ref(), *self.top_state_id().unwrap());
-			self.resume_state(runnables, game_services, true);
+			self.resume_state(runnables, game_services, true, last_state_id);
 		}
 
 		if let Some(last_id) = self.states_ids.last() {
@@ -160,7 +161,7 @@ impl StateDispatcher {
 					self.refresh_systems(systems, game_services, last_state_id.as_ref(), n);
 				}
 				self.pop_state();
-				self.resume_state(runnables, game_services, false);
+				self.resume_state(runnables, game_services, false, last_state_id);
 				! no_more_state
 			} else {
 				true

@@ -136,7 +136,7 @@ impl SystemHolder {
 		if let Some(system) = self.all.get_mut(&system_id) {
 			if system.alive {
 				let mut index = 0;
-				for (i, run) in self.runnables.iter_mut().enumerate() {
+				for (i, run) in self.runnables.iter().enumerate() {
 					let handle_ptr: *const dyn Runnable = run.as_ref();
 					if handle_ptr == system.id.unwrap() {
 						index = i;
@@ -214,6 +214,18 @@ impl World {
 		self.entities_remove_queue.insert(*id);
 	}
 
+	pub fn reset(&mut self) {
+		self.entities_remove_queue.clear();
+		self.components_remove_queue.clear();
+		self.events.clear();
+		for entity_id in &self.entities {
+			self.entities_mask[*entity_id] = Arc::new(RwLock::new(FixedBitSet::new()));
+			self.destruct_component(entity_id, &usize::MAX);
+		}
+		self.entities.clear();
+		self.dead_entities.clear();
+	}
+
 	pub fn is_alive(&self, id: &EntityId) -> bool {
 		self.entities.contains(id)
 	}
@@ -258,10 +270,12 @@ impl World {
 		self.events.clear();
 
 		for entity_id in self.entities_remove_queue.iter() {
-			self.entities_mask[*entity_id] = Arc::new(RwLock::new(FixedBitSet::new()));
-			self.entities.remove(entity_id);
-			self.dead_entities.push(*entity_id);
-			self.destruct_component(entity_id, &usize::MAX);
+			if self.entities.contains(entity_id) {
+				self.entities_mask[*entity_id] = Arc::new(RwLock::new(FixedBitSet::new()));
+				self.entities.remove(entity_id);
+				self.dead_entities.push(*entity_id);
+				self.destruct_component(entity_id, &usize::MAX);
+			}
 		}
 		self.entities_remove_queue.clear();
 	}
@@ -298,8 +312,6 @@ impl World {
 			Option::Some(holder.get_component_mut(entity_id))
 		}
 	}
-
-
 
 }
 
@@ -358,11 +370,13 @@ impl EventObserver<ComponentEvent> for System {
 	fn on_event_mut(&mut self, data: &ComponentEvent) {
 		let contained = self.mask.contains(data.component_id);
 		if data.event_type == 0 && contained && !self.entities.contains(&data.entity_id) {
-			if (&self.mask & &data.entity_mask.upgrade().unwrap().read().unwrap()) == self.mask {
-				//println!("ENTITY {} ADDED TO SYSTEM", data.entity_id);
-				self.entities.insert(data.entity_id);
-			} else {
-				//println!("ENTITY {} IS MISSING SOME BITS", data.entity_id);
+			if let Some(mask) = data.entity_mask.upgrade() {
+				if (&self.mask & &mask.read().unwrap()) == self.mask {
+					//println!("ENTITY {} ADDED TO SYSTEM", data.entity_id);
+					self.entities.insert(data.entity_id);
+				} else {
+					//println!("ENTITY {} IS MISSING SOME BITS", data.entity_id);
+				}
 			}
 			//println!("SYSTEM : {}\nENTITY : {}", self.mask, data.entity_mask.upgrade().unwrap().read().unwrap());
 		} else if data.event_type == 1 && self.entities.contains(&data.entity_id) {

@@ -26,6 +26,10 @@ impl ScoreHandler {
 		let renderable = Renderable::new(self.score_texture_index, None, Some(self.score_rect), i64::MAX - 1);
 		renderer.push_renderable(renderable);
 	}
+
+	pub fn score(&self) -> u32 {
+		self.score
+	}
 }
 
 impl EventObserver<DeathEvent> for ScoreHandler {
