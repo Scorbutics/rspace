@@ -1,8 +1,12 @@
+use std::thread::sleep;
+use std::time::Duration;
+
 use sdl2::render::Canvas;
 use sdl2::render::TextureCreator;
 use sdl2::video::Window;
 use sdl2::video::WindowContext;
 
+use crate::core::common;
 use crate::core::common::GameServices;
 use crate::core::ecs::Runnable;
 use crate::core::ecs::SystemHolder;
@@ -31,7 +35,8 @@ pub struct Game<'sdl_all, 'game> {
 	renderer: Option<SdlRenderer>,
 	resource_manager: Option<SdlResourceManager<'sdl_all>>,
 	game_services: Option<GameServices<'sdl_all, 'game>>,
-	global_runnables: Vec<WeakRunnable>
+	global_runnables: Vec<WeakRunnable>,
+	last_ms: u64
 }
 
 pub trait RunnableNewable : Runnable {
@@ -48,7 +53,8 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 			renderer: Option::None,
 			resource_manager: Option::None,
 			game_services: Option::None,
-			global_runnables: Vec::new()
+			global_runnables: Vec::new(),
+			last_ms: 0
 		};
 		game.state.enqueue_state(first_state);
 		game.systems.add_system::<GraphicsSystem, ()>(&mut game.world, ());
@@ -86,7 +92,6 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 		self.state.update(&mut self.systems, &mut self.global_runnables, self.game_services.as_mut().unwrap());
 
 		let mut event_pump = draw_context.event_pump()?;
-		let mut frame: u32 = 0;
 		'running: loop {
 			// get the inputs here
 			for event in event_pump.poll_iter() {
@@ -95,20 +100,21 @@ impl<'sdl_all, 'game> Game<'sdl_all, 'game> {
 				}
 			}
 
-			// update the game loop here
-			// TODO time dependent
-			if frame >= 30 {
-				let game_services = self.game_services.as_mut().unwrap();
-				self.systems.update(game_services);
-				Self::update_global_runnables(&mut self.global_runnables, game_services);
-				if ! self.state.update(&mut self.systems, &mut self.global_runnables, game_services) {
-					break 'running;
-				}
-				game_services.renderer.update(game_services.resource_manager);
-				frame = 0;
+			let diff_ms = common::current_time_ms() - self.last_ms;
+			// Around 60 FPS
+			if diff_ms < 15 {
+				sleep(Duration::from_millis(diff_ms));
 			}
 
-			frame += 1;
+			self.last_ms = common::current_time_ms();
+			let game_services = self.game_services.as_mut().unwrap();
+			self.systems.update(game_services);
+			Self::update_global_runnables(&mut self.global_runnables, game_services);
+			if ! self.state.update(&mut self.systems, &mut self.global_runnables, game_services) {
+				break 'running;
+			}
+			game_services.renderer.update(game_services.resource_manager);
+
 		}
 		Ok(())
 	}
