@@ -7,8 +7,8 @@ pub fn center(world: &World, entity_id: &EntityId) -> (f32, f32) {
 }
 
 pub fn rect_overlap(rect1: &sdl2::rect::Rect, rect2: &sdl2::rect::Rect) -> bool {
-	(i32::abs((rect1.x + rect1.w/2) - (rect2.x + rect2.w/2)) * 2 < (rect1.w + rect2.w)) &&
-	(i32::abs((rect1.y + rect1.h/2) - (rect2.y + rect2.h/2)) * 2 < (rect1.h + rect2.h))
+	(i32::abs((rect1.x - rect2.x) * 2 + (rect1.w - rect2.w)) < (rect1.w + rect2.w)) &&
+	(i32::abs((rect1.y - rect2.y) * 2 + (rect1.h - rect2.h)) < (rect1.h + rect2.h))
 }
 
 pub fn collision(world: &World, entity1: &EntityId, entity2: &EntityId) -> bool {

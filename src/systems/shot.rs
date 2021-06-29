@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Weak};
 
 use tuple_list::tuple_list_type;
 
@@ -7,7 +7,8 @@ use crate::{components::{health::HealthComponent, hitbox::HitboxComponent, input
 use super::health::HealthSystem;
 
 pub struct ShotSystem {
-	base: Arc<RwLock<System>>
+	base: Arc<RwLock<System>>,
+	health_system: Option<Weak<RwLock<System>>>
 }
 
 impl SystemComponents for ShotSystem {
@@ -17,7 +18,8 @@ impl SystemComponents for ShotSystem {
 impl SystemNewable<ShotSystem, ()> for ShotSystem {
 	fn new(base: Arc<RwLock<System>>, _none: ()) -> Self {
 		ShotSystem {
-			base: base
+			base: base,
+			health_system: None
 		}
 	}
 }
@@ -34,11 +36,13 @@ impl ShotSystem {
 
 impl Runnable for ShotSystem {
 	fn run<'sdl_all, 'l>(&mut self, game_services: &mut GameServices<'sdl_all, 'l>) {
+		if self.health_system.is_none() {
+			self.health_system = game_services.get_world().get_system_base::<HealthSystem>();
+		}
 		for entity in self.base.read().unwrap().iter_entities() {
 
 			// (For this game we can code a naive collision system that will iterate all eligible entities except self and check collisions with it)
-			let health_system = game_services.get_world().get_system_base::<HealthSystem>();
-			for health_entity in health_system.unwrap().upgrade().unwrap().read().unwrap().iter_entities() {
+			for health_entity in self.health_system.as_ref().unwrap().upgrade().unwrap().read().unwrap().iter_entities() {
 				if health_entity != entity {
 					let world = game_services.get_world_mut();
 					let shot = world.get_component::<ShotComponent>(entity).unwrap();
