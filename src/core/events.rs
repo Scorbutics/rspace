@@ -49,7 +49,7 @@ impl<T> Holder for EventBusBase<T> {
 pub trait EventBus<T> {
 	fn register(&mut self, observer: Arc<Observer<T>>);
 	fn unregister(&mut self, observer: Arc<Observer<T>>);
-	fn notify(&self, data: &T);
+	fn notify(&mut self, data: &T);
 }
 
 impl<T> EventBus<T> for EventBusBase<T> {
@@ -61,7 +61,7 @@ impl<T> EventBus<T> for EventBusBase<T> {
 		self.subscribers.retain(|el| el.as_ptr() != &*observer );
 	}
 
-	fn notify(&self, data: &T) {
+	fn notify(&mut self, data: &T) {
 		let mut i = 0;
 		while i < self.subscribers.len() {
 			let obs = &self.subscribers[i];
@@ -70,12 +70,8 @@ impl<T> EventBus<T> for EventBusBase<T> {
 				listener.on_event_mut(&data);
 				i += 1;
 			} else {
-				i += 1;
-			}
-			// TODO : must be mutable...
-			/*else {
 				self.subscribers.remove(i);
-			}*/
+			}
 		}
 	}
 }
@@ -102,8 +98,8 @@ impl EventDispatcher {
 		holder.unregister(observer)
 	}
 
-	pub fn notify<T: 'static>(&self, data: &T) {
-		let holder = meta::holder::<T, EventBusBase<T>>(&EVENT_ID_COUNTER, &self.holders).unwrap();
+	pub fn notify<T: 'static>(&mut self, data: &T) {
+		let holder = meta::holder_mut::<T, EventBusBase<T>>(&EVENT_ID_COUNTER, &mut self.holders);
 		holder.notify(data)
 	}
 }

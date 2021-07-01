@@ -66,20 +66,6 @@ impl<T: Component + Default> Default for ComponentHolder<T> {
 	}
 }
 
-impl EventBus<ComponentEvent> for World {
-	fn register(&mut self, observer: Arc<Observer<ComponentEvent>>) {
-		self.event_bus.register(observer);
-	}
-
-	fn notify(&self, data: &ComponentEvent) {
-		self.event_bus.notify(data);
-	}
-
-	fn unregister(&mut self, observer: Arc<Observer<ComponentEvent>>) {
-		self.event_bus.unregister(observer)
-	}
-}
-
 struct ComponentEvent {
 	component_id: ComponentId,
 	entity_id: EntityId,
@@ -109,7 +95,7 @@ impl SystemHolder {
 	pub fn add_system<T: Runnable + SystemNewable<T, Args> + SystemComponents + 'static, Args>(&mut self, world: &mut World, args: Args) {
 		let base = System::new::<T::Components>();
 		world.register_system_base(base.clone());
-		world.register(base.clone());
+		world.component_masks.register(base.clone());
 		let id= * meta::numeric_type_id::<T>(&states::SYSTEM_ID_COUNTER) as u64;
 		self.all.insert(id, SystemHandle { id: None, system: Some(Box::new(T::new(base.clone(), args))), alive: false });
 	}
@@ -153,32 +139,133 @@ impl SystemHolder {
 
 pub struct World {
 	entities: HashSet<EntityId>,
-	entities_mask: Vec<Arc<RwLock<FixedBitSet>>>,
 	dead_entities: Vec<EntityId>,
 	holders: Vec<Box<dyn InitableHolder>>,
-	event_bus: EventBusBase<ComponentEvent>,
-	components_remove_queue: HashSet<(EntityId, ComponentId)>,
 	entities_remove_queue: HashSet<EntityId>,
-	events: Vec<ComponentEvent>,
-	bases: HashMap<u64, Arc<RwLock<System>>>
+	bases: HashMap<u64, Arc<RwLock<System>>>,
+	component_masks: EntityComponentMask,
 }
 
 static COMPONENT_ID_COUNTER: IdCounter = IdCounter { cell: OnceCell::new(), atomic: AtomicUsize::new(0) };
 
+type ComponentRemovePair = (EntityId, ComponentId);
+struct EntityComponentMask {
+	entities_mask: Vec<Arc<RwLock<FixedBitSet>>>,
+	event_bus: EventBusBase<ComponentEvent>,
+	events: Vec<ComponentEvent>,
+	components_remove_queue: Option<HashSet<ComponentRemovePair>>,
+}
+
+impl EntityComponentMask {
+	fn new() -> Self {
+		let mut w = Self {
+			entities_mask: Vec::with_capacity(ECS_MAX_ENTITIES),
+			event_bus: EventBusBase::new(),
+			events: Vec::new(),
+			components_remove_queue: Some(HashSet::new()),
+		};
+		w.entities_mask.resize(ECS_MAX_ENTITIES, Arc::new(RwLock::new(FixedBitSet::new())));
+		w
+	}
+
+	fn create_mask(&mut self, id: usize) {
+		self.entities_mask[id] = Arc::new(RwLock::new(FixedBitSet::with_capacity(ECS_MAX_COMPONENTS)));
+	}
+
+	fn clear(&mut self, entities: &HashSet<EntityId>) {
+		self.events.clear();
+		self.components_remove_queue.as_mut().unwrap().clear();
+		for entity_id in entities {
+			self.delete_mask(*entity_id);
+		}
+	}
+
+	fn delete_mask(&mut self, id: EntityId) {
+		self.entities_mask[id] = Arc::new(RwLock::new(FixedBitSet::new()));
+		self.notify_component_destruction(id, EntityId::MAX)
+	}
+
+	fn enable_component<T: Component + Default>(&mut self, entity_id: EntityId) {
+		let component_id = *meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
+		self.entities_mask[entity_id].write().unwrap().set(component_id, true);
+		let event = ComponentEvent {
+			component_id: component_id,
+			entity_id: entity_id,
+			entity_mask : Arc::downgrade(&self.entities_mask[entity_id]),
+			event_type: 0
+		};
+		self.events.push(event);
+	}
+
+	fn update_destruct_components(&mut self) {
+		let t = self.components_remove_queue.take().unwrap();
+		for (entity_id, component_id) in &t {
+			if *component_id < usize::MAX {
+				self.entities_mask[*entity_id].write().unwrap().set(*component_id, false);
+			}
+			self.notify_component_destruction(*entity_id, *component_id);
+		};
+		self.components_remove_queue = Some(HashSet::new());
+	}
+
+	fn update(&mut self) {
+		self.update_destruct_components();
+
+		for event in self.events.iter() {
+			self.event_bus.notify(&event);
+		}
+		self.events.clear();
+	}
+
+	fn notify_component_destruction(&mut self, entity_id: EntityId, component_id: ComponentId) {
+		let event = ComponentEvent {
+			component_id: component_id,
+			entity_id: entity_id,
+			entity_mask : Arc::downgrade(&self.entities_mask[entity_id]),
+			event_type: 1
+		};
+		self.event_bus.notify(&event);
+	}
+
+	fn remove_component<T: Component + 'static>(&mut self, entity_id: &EntityId) {
+		if self.has_component::<T>(entity_id) {
+			let component_id = meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
+			self.components_remove_queue.as_mut().unwrap().insert((*entity_id, *component_id));
+		}
+	}
+
+	fn has_component<T: Component>(&self, entity_id: &EntityId) -> bool {
+		let component_id = meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
+		self.entities_mask[*entity_id].read().unwrap()[*component_id]
+	}
+}
+
+impl EventBus<ComponentEvent> for EntityComponentMask {
+	fn register(&mut self, observer: Arc<Observer<ComponentEvent>>) {
+		self.event_bus.register(observer);
+	}
+
+	fn notify(&mut self, data: &ComponentEvent) {
+		self.event_bus.notify(data);
+	}
+
+	fn unregister(&mut self, observer: Arc<Observer<ComponentEvent>>) {
+		self.event_bus.unregister(observer)
+	}
+}
+
+
+
 impl World {
 	pub fn new() -> Self {
-		let mut world = World {
+		let world = World {
 			entities: HashSet::new(),
 			dead_entities: Vec::new(),
-			entities_mask: Vec::with_capacity(ECS_MAX_ENTITIES),
 			holders: Vec::with_capacity(ECS_MAX_COMPONENTS),
-			event_bus: EventBusBase::new(),
-			components_remove_queue: HashSet::new(),
 			entities_remove_queue: HashSet::new(),
-			events: Vec::new(),
-			bases: HashMap::new()
+			bases: HashMap::new(),
+			component_masks: EntityComponentMask::new(),
 		};
-		world.entities_mask.resize(ECS_MAX_ENTITIES, Arc::new(RwLock::new(FixedBitSet::new())));
 		world
 	}
 
@@ -205,7 +292,7 @@ impl World {
 			id = *self.dead_entities.last().unwrap();
 			self.dead_entities.pop();
 		}
-		self.entities_mask[id] = Arc::new(RwLock::new(FixedBitSet::with_capacity(ECS_MAX_COMPONENTS)));
+		self.component_masks.create_mask(id);
 		self.entities.insert(id);
 		id
 	}
@@ -216,12 +303,7 @@ impl World {
 
 	pub fn reset(&mut self) {
 		self.entities_remove_queue.clear();
-		self.components_remove_queue.clear();
-		self.events.clear();
-		for entity_id in &self.entities {
-			self.entities_mask[*entity_id] = Arc::new(RwLock::new(FixedBitSet::new()));
-			self.destruct_component(entity_id, &usize::MAX);
-		}
+		self.component_masks.clear(&self.entities);
 		self.entities.clear();
 		self.dead_entities.clear();
 	}
@@ -232,64 +314,29 @@ impl World {
 
 	pub fn add_component<T: Component + Default>(&mut self, entity_id: &EntityId, component: T) {
 		let holder = meta::holder_mut::<T, ComponentHolder<T>>(&COMPONENT_ID_COUNTER, &mut self.holders);
-		let component_id = *meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
-		//println!("ID : {}", component_id);
 		holder.add_component(entity_id, component);
-		self.entities_mask[*entity_id].write().unwrap().set(component_id, true);
-		let event = ComponentEvent {
-			component_id: component_id,
-			entity_id: *entity_id,
-			entity_mask : Arc::downgrade(&self.entities_mask[*entity_id]),
-			event_type: 0
-		};
-		self.events.push(event);
-	}
-
-	fn destruct_component(&self, entity_id: &EntityId, component_id: &ComponentId) {
-		if *component_id < usize::MAX {
-			self.entities_mask[*entity_id].write().unwrap().set(*component_id, false);
-		}
-		let event = ComponentEvent {
-			component_id: *component_id,
-			entity_id: *entity_id,
-			entity_mask : Arc::downgrade(&self.entities_mask[*entity_id]),
-			event_type: 1
-		};
-		self.notify(&event);
+		self.component_masks.enable_component::<T>(*entity_id);
 	}
 
 	pub fn update(&mut self) {
-		for components_remove_pair in self.components_remove_queue.iter() {
-			self.destruct_component(&components_remove_pair.0, &components_remove_pair.1);
-		}
-		self.components_remove_queue.clear();
-
-		for event in self.events.iter() {
-			self.notify(&event);
-		}
-		self.events.clear();
+		self.component_masks.update();
 
 		for entity_id in self.entities_remove_queue.iter() {
 			if self.entities.contains(entity_id) {
-				self.entities_mask[*entity_id] = Arc::new(RwLock::new(FixedBitSet::new()));
 				self.entities.remove(entity_id);
 				self.dead_entities.push(*entity_id);
-				self.destruct_component(entity_id, &usize::MAX);
+				self.component_masks.delete_mask(*entity_id);
 			}
 		}
 		self.entities_remove_queue.clear();
 	}
 
 	pub fn remove_component<T: Component + 'static>(&mut self, entity_id: &EntityId) {
-		if self.has_component::<T>(entity_id) {
-			let component_id = meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
-			self.components_remove_queue.insert((*entity_id, *component_id));
-		}
+		self.component_masks.remove_component::<T>(entity_id);
 	}
 
 	pub fn has_component<T: Component>(&self, entity_id: &EntityId) -> bool {
-		let component_id = meta::numeric_type_id::<T>(&COMPONENT_ID_COUNTER);
-		self.entities_mask[*entity_id].read().unwrap()[*component_id]
+		self.component_masks.has_component::<T>(entity_id)
 	}
 
 	pub fn get_component<T: Component + Default>(&self, entity_id: &EntityId) -> Option<&T> {

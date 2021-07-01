@@ -23,7 +23,7 @@ impl<'playing_state, L: LevelPhase> Level<L> {
 		}
 	}
 
-	fn notify_current_phase_change(&self) {
+	fn notify_current_phase_change(&mut self) {
 		self.event_bus.notify(self.phases[self.current_phase_index].as_ref());
 	}
 
