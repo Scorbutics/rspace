@@ -1,0 +1,17 @@
+FROM rust:alpine
+
+# ENV DEBIAN_FRONTEND noninteractive
+
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && apk update
+
+RUN apk add sdl2-dev sdl2_mixer-dev sdl2_image-dev sdl2_ttf-dev sdl2_gfx-dev
+
+WORKDIR /root/dev/rspace
+
+COPY . .
+
+RUN cargo build
+
+# RUN apt-get install -y x11-xserver-utils
+# RUN cargo run; echo $?
+CMD [ "cargo", "run", "--release" ]
